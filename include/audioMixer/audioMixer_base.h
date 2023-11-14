@@ -2,6 +2,7 @@
 #define AUDIOMIXER_BASE_H
 
 #include <cstdint>
+#include <memory>
 #include "audioMixer_queue.h"
 
 class audioMixerModule_base

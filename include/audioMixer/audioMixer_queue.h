@@ -13,7 +13,7 @@
 constexpr std::size_t defaultSampleRate = 44100;
 constexpr std::size_t defaultChannelNum = 2;
 constexpr std::size_t defaultBufferSize = 44100;
-constexpr std::size_t defaultMinBuffer = 44;
+constexpr std::size_t defaultMinBuffer  = 44;
 
 struct outputParameter
 {

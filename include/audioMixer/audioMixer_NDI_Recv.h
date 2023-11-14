@@ -164,7 +164,7 @@ void NDI::sourceSearch()
 		if (!sourceMatched) std::print("No source matched! Please try again.\n");
 	} while (true);
 	//create a audioQueue for each selected NDI receiver.
-	audio.resize(recvList.size(), audioQueue<float>(outConfig));
+	audio->resize(recvList.size(), audioQueue<float>(outputConfig));
 }
 /**
 * @brief try to capture NDI AUDIO data from every NDI receiver in recvList.
@@ -186,7 +186,7 @@ void NDI::recvAudio()
 				audio32f.p_data = new float[dataSize];
 				NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio32f);
 				std::vector<float> audioData(audio32f.p_data, audio32f.p_data + dataSize);
-				if (!audio[i].push(std::move(audioData), audio32f.sample_rate, audio32f.no_channels))
+				if (!(*audio)[i].push(std::move(audioData), audio32f.sample_rate, audio32f.no_channels))
 					std::print("No more space in the queue!\n");
 
 				delete[] audio32f.p_data;

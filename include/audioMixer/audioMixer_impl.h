@@ -1,14 +1,13 @@
 #ifndef AUDIOMIXER_IMPL_H
 #define AUDIOMIXER_IMPL_H
 
-
+#include <print>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 
 #include "audioMixer_NDI_Recv.h"
 #include "audioMixer_file.h"
-#include "audioMixer_portaudio.h"
 #include "portaudio.h"
 
 #define PA_CALLBACK_PARAM_LIST const					 void*	inputBuffer,	\
@@ -20,33 +19,39 @@
 class audioMixer
 {
 	friend class portaudio;
+
 	/*Configs*/
 	outputParameter outputConfig;
 	/*Input modules*/
-	/*
-	* order : 
-	* [0] NDI
-	* [1] sndfile
-	* [2] 
-	*/
 	std::unordered_map<std::string,std::unique_ptr<module>> inputModules;
-	portaudio PaOuputModule;
+
+	/*portaudio*/
+	PaStream* PaStreamOut;
+	static int PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData);
+		   int PaOutCallback	 (PA_CALLBACK_PARAM_LIST);
+		  void PaErrorCheck		 (const PaError& err);
+		  void PaStart			 ();
+		  void PaStop			 ();
+
 public:
     audioMixer(const outputParameter& outputCfg);
-   ~audioMixer();
-
-    void NDIThread();
-
-    void startStream();
-	void stopStream ();
+	void startStream();
 };
 
-#pragma region IMPL
+#pragma region IMPL audioMixer
 
 audioMixer::audioMixer(const outputParameter& outputCfg)
+	:	outputConfig (outputCfg)
 {
-	outputConfig = outputCfg;
+	/*input modules init function*/
+	auto NDIInit	 = [&]()
+	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr<NDI>>
+										 ("NDI"		 , std::make_unique<NDI>(outputCfg))); };
+	auto sndfileInit = [&]()
+	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr<soundFile>>
+										 ("sndifle"	 , std::make_unique<soundFile>(outputCfg))); };
 
+	/*Module select*/
 	char ch{};
 	std::pair<bool, std::unique_ptr<module>> mod{};
 
@@ -57,77 +62,87 @@ audioMixer::audioMixer(const outputParameter& outputCfg)
 
 	if (ch == 'A' || ch == 'a')
 	{
-		mod.first
+		NDIInit	   ();
+		sndfileInit();
 	}
 	else if (ch == 'N' || ch == 'n')
-	{
-
-	}
+		NDIInit();
 	else if (ch == 'S' || ch == 's')
-		fileEnabled = true;
+		sndfileInit();
 
 	system("cls");
 
-	
-	
-	//Enable NDI
-	if (NDIEnabled)
-	{
-		if (!NDI)
-		{
-			NDI = std::make_unique<NDI>(outConfig);
-			NDI->start();
-		}
-	}
-	else NDI = nullptr;
+	/*portaudio init function*/
+	PaErrorCheck(Pa_Initialize());
+	PaErrorCheck(Pa_OpenDefaultStream(&PaStreamOut,
+									   0,							//output only
+									   outputConfig.channelNumber,
+									   paFloat32,					//32 bit float [-1;1]
+								       outputConfig.sampleRate,
+									   128,							//frames per buffer
+									  &audioMixer::PaCallbackTransfer,
+									   this));
+}
 
-	//Enable libsndfile
-	if (fileEnabled)
+inline void audioMixer::startStream()
+{
+	PaStart();
+	for (auto& [key,instance] : inputModules)
 	{
-		if (!file)
-		{
-			file = std::make_unique<soundFile>(outConfig);
-			file->start();
-		}
+		instance->start();
 	}
-	else file = nullptr;
+	
+}
+
+#pragma region 
+/*portaudio functions*/
+int audioMixer::PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData)
+{
+	return static_cast<audioMixer*>(userData)->PaOutCallback(inputBuffer,
+															 outputBuffer,
+															 framesPerBuffer,
+															 timeInfo,
+															 statusFlags);
+}
+
+int audioMixer::PaOutCallback(PA_CALLBACK_PARAM_LIST)
+{
+	//output buffer init
+	auto out = static_cast<float*>(outputBuffer);
+	memset(out, 0, sizeof(out) * framesPerBuffer);
+
+	for (auto& [name, moduleInstance] : inputModules)
+		if (moduleInstance->isActive())
+			for (auto& audioVec : *(moduleInstance->getAudio()))
+				audioVec.pop(out, framesPerBuffer, true);
+
+	return paContinue;
+}
+
+void audioMixer::PaErrorCheck(const PaError& err)
+{
+	if (err)
+	{
+		std::print("PortAudio error : {}.\n",
+			Pa_GetErrorText(err));
+		exit(EXIT_FAILURE);
+	}
+}
+
+inline void audioMixer::PaStart()
+{
 	Pa_StartStream(PaStreamOut);
 }
 
-audioMixer::~audioMixer()
+inline void audioMixer::PaStop()
 {
-	if (NDI)
-	{
-		NDI->stop();
-		NDI.release();
-	}
-	if (file)
-	{
-		file->stop();
-		file.release();
-	}
-
-	PaErrorCheck(Pa_StopStream(PaStreamOut));
-	PaErrorCheck(Pa_CloseStream(PaStreamOut));
-	PaErrorCheck(Pa_Terminate());
+	if (Pa_IsStreamActive(PaStreamOut))
+		PaErrorCheck(Pa_StopStream(PaStreamOut));
 }
-
-void audioMixer::NDIThread()
-{
-	NDI->sourceSearch();
-	NDI->recvAudio();
-}
-
-void audioMixer::startStream()
-{
-	if(NDIEnabled)
-		std::jthread tNDI(&audioMixer::NDIThread, this);
-}
-
-void audioMixer::stopStream()
-{
-	NDI->stop();
-}
+#pragma endregion 
+//portaudio module
 
 #pragma endregion
-#endif// AUDIOMIXER_PORTAUDIO_H
+//IMPL audioMixer
+
+#endif//AUDIOMIXER_IMPL_H

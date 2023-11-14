@@ -143,7 +143,6 @@
     <ClInclude Include="include\audioMixer\audioMixer_file.h" />
     <ClInclude Include="include\audioMixer\audioMixer_impl.h" />
     <ClInclude Include="include\audioMixer\audioMixer_NDI_Recv.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_portaudio.h" />
     <ClInclude Include="include\audioMixer\audioMixer_queue.h" />
   </ItemGroup>
   <ItemGroup>

@@ -33,9 +33,6 @@
     <ClInclude Include="include\audioMixer\audioMixer_impl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\audioMixer\audioMixer_portaudio.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\audioMixer.cpp">

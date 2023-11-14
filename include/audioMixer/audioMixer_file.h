@@ -82,14 +82,14 @@ void soundFile::readAudioFile()
 		float* temp = new float[bufferSize];
 		i.read(temp, bufferSize);
 
-		outConfig.queueCapacity = bufferSize;
-		audioQueue<float> sndQueue(outConfig);
+		outputConfig.queueCapacity = bufferSize;
+		audioQueue<float> sndQueue(outputConfig);
 		std::vector<float> audioData(temp, temp + bufferSize);
 
 		sndQueue.push(std::move(audioData), i.samplerate(), i.channels());
 		delete[] temp;
 
-		audio.push_back(std::move(sndQueue));
+		audio->push_back(std::move(sndQueue));
 	}
 	return;
 }

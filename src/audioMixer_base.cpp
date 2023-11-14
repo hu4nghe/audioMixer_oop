@@ -5,4 +5,7 @@ audioMixerModule_base::audioMixerModule_base()
 
 audioMixerModule_base::audioMixerModule_base(const outputParameter& outputCfg)
 	:	active		(false),
-		outputConfig(outputCfg) {}
+		outputConfig(outputCfg)
+{
+	audio = std::make_shared<std::vector<audioQueue<float>>>();
+}
