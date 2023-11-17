@@ -1,10 +1,7 @@
 #ifndef AUDIOMIXER_IMPL_H
 #define AUDIOMIXER_IMPL_H
 
-#include <print>
-#include <thread>
 #include <unordered_map>
-#include <utility>
 
 #include "audioMixer_NDI_Recv.h"
 #include "audioMixer_file.h"
@@ -91,11 +88,10 @@ inline void audioMixer::startStream()
 	{
 		instance->start();
 	}
-	
 }
 
-#pragma region 
-/*portaudio functions*/
+#pragma region portaudio module
+
 int audioMixer::PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData)
 {
 	return static_cast<audioMixer*>(userData)->PaOutCallback(inputBuffer,

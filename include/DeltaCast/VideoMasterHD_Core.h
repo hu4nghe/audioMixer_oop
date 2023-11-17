@@ -1717,13 +1717,13 @@ extern "C" {
    Parameters
    pApiVersion :  Optional pointer to a variable wherein the
                   library stores its version number
-   pNbBoards :    Optional pointer to a variable wherein the
+   pboardNumber :    Optional pointer to a variable wherein the
                   library stores the number of detected Deltacast
                   cards
    Returns
    The function returns the status of its execution as
    VideoMaster error code (see VHD_ERRORCODE enumeration)       */
-VIDEOMASTER_HD_API ULONG VHD_GetApiInfo (ULONG *pApiVersion, ULONG *pNbBoards);
+VIDEOMASTER_HD_API ULONG VHD_GetApiInfo (ULONG *pApiVersion, ULONG *pboardNumber);
 
 
 
@@ -2559,7 +2559,7 @@ VIDEOMASTER_HD_API ULONG VHD_GetClockReconstructionCurrentTime(LONGLONG* pCurren
    This function provides information about the number
    of detected Deltacast gateway devices
    Parameters
-   pNbBoards :    Optional pointer to a variable wherein the
+   pboardNumber :    Optional pointer to a variable wherein the
                   library stores the number of detected Deltacast
                   gateway devices
    Returns

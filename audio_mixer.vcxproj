@@ -140,6 +140,7 @@
   <ItemGroup>
     <ClInclude Include="include\audioMixer\audioMixer.h" />
     <ClInclude Include="include\audioMixer\audioMixer_base.h" />
+    <ClInclude Include="include\audioMixer\audioMixer_DeltaCast.h" />
     <ClInclude Include="include\audioMixer\audioMixer_file.h" />
     <ClInclude Include="include\audioMixer\audioMixer_impl.h" />
     <ClInclude Include="include\audioMixer\audioMixer_NDI_Recv.h" />

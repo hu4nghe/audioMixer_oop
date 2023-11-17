@@ -65,8 +65,10 @@ public:
 class NDI : public module
 {
 	friend class audioMixer;
+
 	/*NDI Receivers*/
 	std::vector<NDIlib_recv_instance_t>	recvList;
+	
 	
 	void sourceSearch();
 	void recvAudio	 ();
