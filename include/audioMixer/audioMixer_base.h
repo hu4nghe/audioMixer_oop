@@ -25,8 +25,8 @@ public:
 
     virtual ~audioMixerModule_base() {}
 
-    virtual void start   () = 0;
-    virtual void stop    () = 0;
+    virtual void start() = 0;
+    virtual void stop () = 0;
 
     std::shared_ptr<std::vector<audioQueue<float>>> getAudio() { return audio; }
 

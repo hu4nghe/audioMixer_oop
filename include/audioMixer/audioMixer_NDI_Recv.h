@@ -36,7 +36,8 @@ public:
 	{ 
 		NDIlib_find_destroy(finder); 
 	}
-	std::vector<NDIlib_source_t> findSources(std::uint32_t timeout)
+	
+   auto findSources(std::uint32_t timeout) -> std::vector<NDIlib_source_t>
 	{
 		const NDIlib_source_t* source		= nullptr;
 				std::uint32_t  sourceNumber	= 0;
