@@ -16,13 +16,10 @@
 
 class audioMixer
 {
-	friend class portaudio;
-
-	/*Configs*/
+	/*Portaudio output configurations*/
 	outputParameter outputConfig;
 	/*Input modules*/
 	std::unordered_map<std::string,std::unique_ptr<module>> inputModules;
-
 	/*portaudio*/
 	  PaStream* PaStreamOut;
 	static int  PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData);
@@ -30,7 +27,6 @@ class audioMixer
 		  void  PaErrorCheck	  (const PaError& err);
 		  void  PaStart			  ();
 		  void  PaStop			  ();
-
 public:
     audioMixer(const outputParameter& outputCfg);
 	void startStream();
@@ -42,37 +38,49 @@ audioMixer::audioMixer(const outputParameter& outputCfg)
 	:	outputConfig (outputCfg)
 {
 	/*input modules init function*/
-	auto NDIInit	 = [&]()
-	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr<NDI>>
-										 ("NDI"		 , std::make_unique<NDI>(outputCfg))); };
-	auto sndfileInit = [&]()
-	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr<soundFile>>
+	auto NDIInit	   = [&]()
+	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr <NDI>>
+										 ("NDI"		 , std::make_unique<NDI>	  (outputCfg))); };
+	auto sndfileInit   = [&]()
+	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr <soundFile>>
 										 ("sndifle"	 , std::make_unique<soundFile>(outputCfg))); };
 	auto deltaCastInit = [&]()
-	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr<deltaCast>>
+	{ inputModules.insert(std::make_pair <std::string, std::unique_ptr <deltaCast>>
 										 ("deltaCast", std::make_unique<deltaCast>(outputCfg))); };
 	/*Module select*/
 	char ch{};
-	std::pair<bool, std::unique_ptr<module>> mod{};
-
 	std::print("Module selection :\n");
-	std::print("N(DI)	S(ndfile)	D(eltaCast)		A(ll)\n");
-
-	std::cin >> ch;
-
-	if (ch == 'A' || ch == 'a')
+	std::print("N(DI)	S(ndfile)	D(elta Cast)	A(ll)\n");
+	bool moduleSelected{false};
+	do
 	{
-		NDIInit();
-		sndfileInit();
-		deltaCastInit();
-	}
-	else if (ch == 'N' || ch == 'n')
-		NDIInit();
-	else if (ch == 'S' || ch == 's')
-		sndfileInit();
-	else if (ch == 'D' || ch == 'd')
-		deltaCastInit();
+		std::cin >> ch;
 
+		if (ch == 'A' || ch == 'a')
+		{
+			NDIInit();
+			sndfileInit();
+			deltaCastInit();
+			moduleSelected = true;
+		}
+		else if (ch == 'N' || ch == 'n')
+		{
+			NDIInit();
+			moduleSelected = true;
+		}
+		else if (ch == 'S' || ch == 's')
+		{
+			sndfileInit();
+			moduleSelected = true;
+		}
+		else if (ch == 'D' || ch == 'd')
+		{
+			deltaCastInit();
+			moduleSelected = true;
+		}
+		else
+			std::print("invalide choice!\n");
+	} while (!moduleSelected);
 	system("cls");
 
 	/*portaudio init function*/
@@ -124,14 +132,14 @@ void audioMixer::PaErrorCheck(const PaError& err)
 	if (err)
 	{
 		std::print("PortAudio error : {}.\n",
-			Pa_GetErrorText(err));
+				    Pa_GetErrorText(err));
 		exit(EXIT_FAILURE);
 	}
 }
 
 inline void audioMixer::PaStart()
 {
-	std::this_thread::sleep_for(std::chrono::seconds(10));
+	std::this_thread::sleep_for(std::chrono::seconds(8));
 	Pa_StartStream(PaStreamOut);
 }
 

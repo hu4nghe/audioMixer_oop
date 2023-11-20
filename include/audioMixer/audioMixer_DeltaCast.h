@@ -20,12 +20,12 @@ public:
             throw std::runtime_error("Cannot open DELTA board handle.");
         else
         {
-            ULONG boardType{};
+            ULONG boardType{0};
             VHD_GetBoardProperty(handle, VHD_CORE_BP_BOARD_TYPE, &boardType);
-            auto isHDMI = ((boardType == VHD_BOARDTYPE_HDMI) ||
-                (boardType == VHD_BOARDTYPE_HDMI20) ||
-                (boardType == VHD_BOARDTYPE_FLEX_HMI) ||
-                (boardType == VHD_BOARDTYPE_MIXEDINTERFACE));
+            bool isHDMI = ((boardType == VHD_BOARDTYPE_HDMI)            ||
+                           (boardType == VHD_BOARDTYPE_HDMI20)          ||
+                           (boardType == VHD_BOARDTYPE_FLEX_HMI)        ||
+                           (boardType == VHD_BOARDTYPE_MIXEDINTERFACE));
             if (!isHDMI)
                 throw std::runtime_error("ERROR : The selected board is not a HDMI or DVI board");
         }
@@ -36,7 +36,7 @@ public:
 };
 class streamHandle
 {
-    void* handle{ nullptr };
+    void* handle{nullptr};
 public: 
     streamHandle(const boardHandle& brdHdl)
     {
@@ -83,14 +83,14 @@ public:
 deltaCast::deltaCast(const outputParameter& outputCfg)
 	:	module(outputCfg)
 {
-    ULONG boardNumber { 0 };
+    ULONG boardNumber {0};
     if (VHD_GetApiInfo(nullptr, &boardNumber))
         throw std::runtime_error("Cannot query VideoMaster information.");
     else
     {
         if(boardNumber)
         {
-            boardHdl  = std::make_unique<boardHandle>();
+             boardHdl = std::make_unique< boardHandle>();
             streamHdl = std::make_unique<streamHandle>(*boardHdl);
         }    
         else
@@ -100,7 +100,7 @@ deltaCast::deltaCast(const outputParameter& outputCfg)
 
 inline void deltaCast::start()
 {
-    std::jthread receiveThread([this]() { this->streamConfig();;
+    std::jthread receiveThread([this]() { this->streamConfig();
                                           this->startStream (); });
 }
 inline void deltaCast::stop()
@@ -111,14 +111,14 @@ inline void deltaCast::stop()
 
 inline std::size_t deltaCast::getSampleRate() const 
 {
-    const int code{ HDMIAudioInfoFrame.SamplingFrequency };
+    const int code{HDMIAudioInfoFrame.SamplingFrequency};
     std::size_t sampleRate{};
     switch (code)
     {
     case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_REF_STREAM_HEADER:
     {
         //We need to do a reference to stream header.
-        const int codeRef{ HDMIAudioAESSts.SamplingFrequency };
+        const int codeRef{HDMIAudioAESSts.SamplingFrequency};
         switch (codeRef)
         {
         case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_44100HZ:
@@ -182,8 +182,9 @@ inline std::size_t deltaCast::getSampleRate() const
 }
 inline std::uint8_t deltaCast::getChannelNumbers() const
 {
-    std::uint8_t channelNumber{};
-    const int code = HDMIAudioInfoFrame.ChannelCount;
+    const std::uint32_t code         { HDMIAudioInfoFrame.ChannelCount };
+          std:: uint8_t channelNumber{};
+    
     switch (code) 
     {
     case VHD_DV_AUDIO_INFOFRAME_CHANNEL_COUNT_REF_STREAM_HEADER:
@@ -221,7 +222,7 @@ inline std::uint8_t deltaCast::getChannelNumbers() const
 
 inline void deltaCast::streamConfig()
 {
-    VHD_DV_MODE DvMode{ NB_VHD_DV_MODES };
+    VHD_DV_MODE DvMode{NB_VHD_DV_MODES};
     do
     {
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_MODE, (ULONG*)&DvMode);
@@ -232,8 +233,8 @@ inline void deltaCast::streamConfig()
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_BUFFER_PACKING , VHD_BUFPACK_VIDEO_RGB_32);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
         /* Get auto-detected resolution */
-        ULONG Height{ 0 }, Width{ 0 }, RefreshRate{ 0 }, PxlClk{ 0 };
-        BOOL32 Interlaced{ FALSE };
+        ULONG Height{0}, Width{0}, RefreshRate{0}, PxlClk{0};
+        BOOL32 Interlaced{0};
         VHD_DV_CS InputCS{};
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH ,         &Width);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT,         &Height);
@@ -242,8 +243,7 @@ inline void deltaCast::streamConfig()
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , (ULONG*)&InputCS);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  ,         &PxlClk);
         std::print("Incoming graphic resolution : {0}x{1} ({2})\n", Width, Height, Interlaced ? "Interlaced" : "Progressive");
-        /* Configure stream. Only VHD_DV_SP_ACTIVE_WIDTH, VHD_DV_SP_ACTIVE_HEIGHT,
-        VHD_DV_SP_INTERLACED and VHD_DV_SP_REFRESH_RATE properties are required for HDMI */
+        /* Configure stream.*/
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH , Width);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT, Height);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , Interlaced);
@@ -258,11 +258,11 @@ inline void deltaCast::streamConfig()
 inline void deltaCast::startStream()
 {
     
-    HANDLE slotHandle{ nullptr };
-    BYTE* pBuffer{ nullptr };
-    BYTE* pAudioBuffer{ nullptr };
-    ULONG  bufferSize{ 0 };
-    audioQueue<float> queue;
+    HANDLE slotHandle   {nullptr};
+    BYTE*  pBuffer      {nullptr};
+    BYTE*  pAudioBuffer {nullptr};
+    ULONG  bufferSize   {0};
+    audioQueue<float> queue(outputConfig);
     audio->push_back(queue);
 
 
@@ -287,22 +287,15 @@ inline void deltaCast::startStream()
             {
                 if (HDMIAudioAESSts.LinearPCM == VHD_DV_AUDIO_AES_SAMPLE_STS_LINEAR_PCM_SAMPLE)
                 {
-                    VHD_SlotExtractDvPCMAudio(slotHandle, VHD_DVAUDIOFORMAT_16, 0x3, nullptr, &bufferSize);
+                    VHD_SlotExtractDvPCMAudio(slotHandle, VHD_DVAUDIOFORMAT_16, 0x3, nullptr     , &bufferSize);//get buffer size
                     pAudioBuffer = new UBYTE[bufferSize];
                     VHD_SlotExtractDvPCMAudio(slotHandle, VHD_DVAUDIOFORMAT_16, 0x3, pAudioBuffer, &bufferSize);
+
                     auto temp = composition16bit(pAudioBuffer, bufferSize);
                     std::vector<float> floatData(temp.size());
                     src_short_to_float_array(temp.data(), floatData.data(), temp.size());
 
-                    if (!set)
-                    {
-                        (*audio)[0].setCapacity(floatData.size() + 10);
-                        set = true;
-                    }
-
                     (*audio)[0].push(std::move(floatData), getSampleRate(), getChannelNumbers());
-                    
-                    
                 }
                 if (pAudioBuffer)
                 {
@@ -310,12 +303,8 @@ inline void deltaCast::startStream()
                     pAudioBuffer = nullptr;
                 }
             }
-
             /* Unlock slot */
             VHD_UnlockSlotHandle(slotHandle);
-            /* Print some statistics
-            VHD_GetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_SLOTS_COUNT, &NbFramesRecv);
-            VHD_GetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_SLOTS_DROPPED, &NbFramesDropped);*/
         }
         else if (Result != VHDERR_TIMEOUT)
             throw std::runtime_error("ERROR : Cannot lock slot on RX0 stream.");
@@ -331,7 +320,7 @@ inline std::vector<short> deltaCast::composition16bit(const std::uint8_t* source
     if (sourceSize % 2)
         throw std::invalid_argument("HDMI Audio Error : Invalid buffer size for 16 bit audio data.");
     else
-        for (auto i {0}, j {0}; i < sourceSize; i += 2, ++j)
+        for (auto i{0}, j{0}; i < sourceSize; i += 2, ++j)
             combined16bit[j] = static_cast<std::uint32_t>(sourceAudio[i + 1]  << 8) |
                                static_cast<std::uint32_t>(sourceAudio[i    ]);
     
