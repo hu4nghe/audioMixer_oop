@@ -28,7 +28,7 @@ public:
     virtual void start() = 0;
     virtual void stop () = 0;
 
-    std::shared_ptr<std::vector<audioQueue<float>>> getAudio() { return audio; }
+    auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio; }
 
     [[nodiscard]] bool isActive() const { return active; }
 };

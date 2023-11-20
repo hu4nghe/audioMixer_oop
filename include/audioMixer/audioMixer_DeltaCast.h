@@ -8,11 +8,11 @@
 
 #include <print>
 
-#pragma region boardHandle, streamHandle
+#pragma region Handles
 class boardHandle
 {
-    std::uint32_t boardID{ 0 };
-    void*         handle { nullptr };
+    std::uint32_t  boardID{0};
+             void* handle {nullptr};
 public:
     boardHandle()
     {
@@ -34,25 +34,22 @@ public:
 
     [[nodiscard]] auto getHandle() const -> decltype(handle)  { return handle; }
 };
-
 class streamHandle
 {
     void* handle{ nullptr };
 public: 
     streamHandle(const boardHandle& brdHdl)
     {
-        if (VHD_OpenStreamHandle(brdHdl.getHandle(),
-            VHD_ST_RX0,
-            VHD_DV_STPROC_JOINED,
-            nullptr,
-            &handle,
-            nullptr))
+        if (VHD_OpenStreamHandle(brdHdl.getHandle(), VHD_ST_RX0, VHD_DV_STPROC_JOINED, nullptr, &handle, nullptr))
             throw std::runtime_error("ERROR : Cannot open RX0 stream on HDMI / DVI board handle.");
         else
             if (VHD_SetStreamProperty(handle, VHD_DV_SP_MODE, VHD_DV_MODE_HDMI))
                 throw std::runtime_error("ERROR : Cannot configure RX0 stream primary mode.");
     }
-    ~streamHandle(){ VHD_CloseStreamHandle(handle); }
+   ~streamHandle()
+   { 
+       VHD_CloseStreamHandle(handle); 
+   }
     [[nodiscard]] auto getHandle() const -> decltype(handle)  { return handle; }
 };
 #pragma endregion
@@ -62,8 +59,8 @@ class deltaCast : public audioMixerModule_base
 {
     std::unique_ptr< boardHandle>   boardHdl;
     std::unique_ptr<streamHandle>   streamHdl;
-          VHD_DV_AUDIO_INFOFRAME    HDMIAudioInfoFrame {};
-            VHD_DV_AUDIO_AES_STS    HDMIAudioAESSts    {};
+          VHD_DV_AUDIO_INFOFRAME    HDMIAudioInfoFrame{};
+            VHD_DV_AUDIO_AES_STS    HDMIAudioAESSts   {};
 
     auto composition16bit(const std::uint8_t* sourceAudio,
                           const std:: size_t  sourceSize) -> std::vector<short>;
@@ -73,8 +70,8 @@ public:
 	void start() override;
 	void stop () override;
 
-	        void recvAudio        ();
-            void recvHDMI         ();
+            void streamConfig     ();
+            void startStream      ();
     std:: size_t getSampleRate    () const;
     std::uint8_t getChannelNumbers() const;
     
@@ -91,295 +88,37 @@ deltaCast::deltaCast(const outputParameter& outputCfg)
         throw std::runtime_error("Cannot query VideoMaster information.");
     else
     {
-        if(!boardNumber)
-            throw std::runtime_error("No Delta board detected.");
-        else
+        if(boardNumber)
         {
-            boardHdl  = std::make_unique< boardHandle>();
+            boardHdl  = std::make_unique<boardHandle>();
             streamHdl = std::make_unique<streamHandle>(*boardHdl);
-        }
+        }    
+        else
+            throw std::runtime_error("No Delta board detected.");
     }
 }
 
 inline void deltaCast::start()
 {
-
+    std::jthread receiveThread([this]() { this->streamConfig();;
+                                          this->startStream (); });
 }
-
 inline void deltaCast::stop()
 {
-
-}
-
-inline void deltaCast::recvAudio()
-{
-    {
-        ULONG                      Result, dllVersion, boardNumber, boardType;
-        ULONG                      i;
-        ULONG                      NbFramesRecv = 0, NbFramesDropped = 0, BufferSize = 0, AudioBufferSize = 0, PxlClk = 0;
-        HANDLE                     BoardHandle = nullptr, StreamHandle = nullptr, SlotHandle = nullptr;
-        ULONG                      Height = 0, Width = 0, RefreshRate = 0;
-        VHD_DV_MODE                DvMode = NB_VHD_DV_MODES;
-        ULONG                      BrdId = 0;
-        BOOL32                     Interlaced = FALSE;
-        BOOL32                     IsHdmiBoard = FALSE;
-        BYTE*                      pBuffer = nullptr, * pAudioBuffer = nullptr;
-        VHD_DV_CS                  InputCS;
-        VHD_DV_AUDIO_TYPE          HDMIAudioType;
-        
-        /* Query VideoMaster information */
-        Result = VHD_GetApiInfo(&dllVersion, &boardNumber);
-        if (Result == VHDERR_NOERROR)
-        {
-            std::print("VideoMaster DLL v{0}.{1}.{2}\nboard number : {3}",
-                        dllVersion >> 24, 
-                       (dllVersion >> 16) & 0xFF, 
-                        dllVersion & 0xFFFF,
-                        boardNumber);
-
-            if (boardNumber > 0)
-            {
-                /* Open a handle on selected DELTA board */
-                Result = VHD_OpenBoardHandle(BrdId, &BoardHandle, nullptr, 0);
-                if (Result == VHDERR_NOERROR)
-                {
-                    VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_BOARD_TYPE, &boardType);
-                    IsHdmiBoard = ((boardType == VHD_BOARDTYPE_HDMI) || (boardType == VHD_BOARDTYPE_HDMI20) || (boardType == VHD_BOARDTYPE_FLEX_HMI) || (boardType == VHD_BOARDTYPE_MIXEDINTERFACE));
-
-                    /* Check the board type of the selected board */
-                    if (IsHdmiBoard)
-                    {
-                        /* Create a logical stream to receive from RX0 connector */
-                        Result = VHD_OpenStreamHandle(BoardHandle, VHD_ST_RX0, IsHdmiBoard ? VHD_DV_STPROC_JOINED : VHD_DV_STPROC_DEFAULT, nullptr, &StreamHandle, nullptr);
-                        if (Result == VHDERR_NOERROR)
-                        {
-                            /* Set the primary mode of this channel to HDMI */
-                            Result = VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_MODE, VHD_DV_MODE_HDMI);
-                            if (Result == VHDERR_NOERROR)
-                            {
-                                printf("Waiting for incoming HDMI signal... \n");
-                                do
-                                {
-                                    /* Auto-detect Dv mode */
-                                    Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_MODE, (ULONG*)&DvMode);
-
-                                } while (DvMode != VHD_DV_MODE_HDMI || Result != VHDERR_NOERROR);
-
-                                if (Result == VHDERR_NOERROR && DvMode == VHD_DV_MODE_HDMI)
-                                {
-                                    /* Configure RGBA reception (no color-space conversion) */
-                                    VHD_SetStreamProperty(StreamHandle, VHD_CORE_SP_BUFFER_PACKING, VHD_BUFPACK_VIDEO_RGB_32);
-                                    VHD_SetStreamProperty(StreamHandle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
-
-                                    /* Get auto-detected resolution */
-                                    Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_WIDTH, &Width);
-                                    if (Result == VHDERR_NOERROR)
-                                    {
-                                        Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_HEIGHT, &Height);
-                                        if (Result == VHDERR_NOERROR)
-                                        {
-                                            Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_INTERLACED, (ULONG*)&Interlaced);
-                                            if (Result == VHDERR_NOERROR)
-                                            {
-                                                Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_REFRESH_RATE, &RefreshRate);
-                                                if (Result == VHDERR_NOERROR)
-                                                {
-                                                    if (IsHdmiBoard)
-                                                        Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_INPUT_CS, (ULONG*)&InputCS);
-
-                                                    if (Result == VHDERR_NOERROR)
-                                                    {
-                                                        if (IsHdmiBoard)
-                                                            Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_PIXEL_CLOCK, &PxlClk);
-
-                                                        if (Result == VHDERR_NOERROR)
-                                                        {
-                                                            std::print("Incoming graphic resolution : %ux%u (%s)\n", Width, Height, Interlaced ? "Interlaced" : "Progressive");
-
-                                                            /* Configure stream. Only VHD_DV_SP_ACTIVE_WIDTH, VHD_DV_SP_ACTIVE_HEIGHT,
-                                                            VHD_DV_SP_INTERLACED and VHD_DV_SP_REFRESH_RATE properties are required for HDMI */
-
-                                                            VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_WIDTH, Width);
-                                                            VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_HEIGHT, Height);
-                                                            VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_INTERLACED, Interlaced);
-                                                            VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_REFRESH_RATE, RefreshRate);
-
-                                                            /* VHD_DV_SP_INPUT_CS and VHD_DV_SP_PIXEL_CLOCK are required for DELTA-h4k only */
-                                                            if (boardType == VHD_BOARDTYPE_HDMI)
-                                                            {
-                                                                VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_INPUT_CS, InputCS);
-                                                                VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_PIXEL_CLOCK, PxlClk);
-                                                            }
-
-                                                            /* Start stream */
-                                                            Result = VHD_StartStream(StreamHandle);
-                                                            if (Result == VHDERR_NOERROR)
-                                                            {
-                                                                std::print("Reception started\n");
-
-                                                                /* Reception loop */
-                                                                while (true)
-                                                                {
-                                                                    /* Try to lock next slot */
-                                                                    Result = VHD_LockSlotHandle(StreamHandle, &SlotHandle);
-
-                                                                    if (Result == VHDERR_NOERROR)
-                                                                    {
-                                                                        Result = VHD_GetSlotBuffer(SlotHandle, VHD_DV_BT_VIDEO, &pBuffer, &BufferSize);
-                                                                        if (Result == VHDERR_NOERROR)
-                                                                        {
-                                                                            /* Do RX data processing here on pBuffer */
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            std::print("ERROR : Cannot get video slot buffer.\n");
-                                                                            break;
-                                                                        }
-                                                                        if (IsHdmiBoard)
-                                                                        {
-                                                                            /* Do RX data processing here on pBuffer */
-                                                                            Result = VHD_GetSlotDvAudioInfo(SlotHandle, &HDMIAudioType, &HDMIAudioInfoFrame, &HDMIAudioAESSts);
-
-                                                                            if (Result == VHDERR_NOERROR)
-                                                                            {
-                                                                                if (HDMIAudioType != VHD_DV_AUDIO_TYPE_NONE)
-                                                                                {
-                                                                                    BufferSize = 0;
-                                                                                    if (HDMIAudioAESSts.LinearPCM == VHD_DV_AUDIO_AES_SAMPLE_STS_LINEAR_PCM_SAMPLE)
-                                                                                    {
-                                                                                        VHD_SlotExtractDvPCMAudio(SlotHandle, VHD_DVAUDIOFORMAT_16, 0x3, nullptr, &BufferSize);
-                                                                                        pAudioBuffer = new UBYTE[BufferSize];
-                                                                                        Result = VHD_SlotExtractDvPCMAudio(SlotHandle, VHD_DVAUDIOFORMAT_16, 0x3, pAudioBuffer, &BufferSize);
-                                                                                        if (Result == VHDERR_NOERROR)
-                                                                                        {
-                                                                                            auto temp = composition16bit(pAudioBuffer, BufferSize);
-                                                                                            std::vector<float> floatData(temp.size());
-                                                                                            
-                                                                                            src_short_to_float_array(temp.data(), floatData.data(), temp.size());
-
-                                                                                            (*audio)[0].push(std::move(floatData), getSampleRate(), getChannelNumbers());
-                                                                                            
-                                                                                        }
-                                                                                        else
-                                                                                        {
-                                                                                            std::print("ERROR : Cannot get PCM audio slot buffer. \n");
-                                                                                            break;
-                                                                                        }
-                                                                                    }
-                                                                                    else
-                                                                                    {
-                                                                                        VHD_SlotExtractDvNonPCMAudio(SlotHandle, nullptr, &BufferSize);
-                                                                                        pAudioBuffer = new UBYTE[BufferSize];
-                                                                                        Result = VHD_SlotExtractDvNonPCMAudio(SlotHandle, pAudioBuffer, &BufferSize);
-                                                                                        if (Result == VHDERR_NOERROR)
-                                                                                        {
-                                                                                            /* Do Non-PCM audio data processing here on pAudioBufferPacked_UB */
-                                                                                        }
-                                                                                        else
-                                                                                        {
-                                                                                            std::print("ERROR : Cannot get Non-PCM audio slot buffer. \n");
-                                                                                            break;
-                                                                                        }
-                                                                                    }
-
-                                                                                    if (pAudioBuffer)
-                                                                                    {
-                                                                                        delete[] pAudioBuffer;
-                                                                                        pAudioBuffer = nullptr;
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                            else
-                                                                            {
-                                                                                std::print("ERROR : Cannot get HDMI audio info. \n");
-                                                                                break;
-                                                                            }
-                                                                        }
-
-                                                                        /* Unlock slot */
-                                                                        VHD_UnlockSlotHandle(SlotHandle);
-
-                                                                        /* Print some statistics */
-                                                                        VHD_GetStreamProperty(StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &NbFramesRecv);
-                                                                        VHD_GetStreamProperty(StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &NbFramesDropped);
-                                                                        printf("%u frames received (%u dropped)            \r", NbFramesRecv, NbFramesDropped);
-                                                                        fflush(stdout);
-                                                                    }
-                                                                    else if (Result != VHDERR_TIMEOUT)
-                                                                    {
-                                                                        std::print("ERROR : Cannot lock slot on RX0 stream. \n");
-                                                                        break;
-                                                                    }
-                                                                }
-
-                                                                std::print("");
-
-                                                                /* Stop stream */
-                                                                VHD_StopStream(StreamHandle);
-                                                            }
-                                                            else
-                                                                printf("ERROR : Cannot start RX0 stream on DV board handle. \n");
-                                                        }
-                                                        else
-                                                            printf("ERROR : Cannot detect incoming pixel clock from RX0. \n");
-                                                    }
-                                                    else
-                                                        printf("ERROR : Cannot detect incoming color space from RX0. \n");
-                                                }
-                                                else
-                                                    printf("ERROR : Cannot detect incoming refresh rate from RX0. \n");
-                                            }
-                                            else
-                                                printf("ERROR : Cannot detect if incoming stream from RX0 is interlaced or progressive. \n");
-                                        }
-                                        else
-                                            printf("ERROR : Cannot detect incoming active height from RX0. \n");
-                                    }
-                                    else
-                                        printf("ERROR : Cannot detect incoming active width from RX0. \n");
-                                }
-                                else
-                                    printf("ERROR : Cannot detect if incoming mode is HDMI. \n");
-                            }
-                            else
-                                printf("ERROR : Cannot configure RX0 stream primary mode. \n");
-
-                            /* Close stream handle */
-                            VHD_CloseStreamHandle(StreamHandle);
-                        }
-                        else
-                            printf("ERROR : Cannot open RX0 stream on HDMI / DVI board handle. \n");
-                    }
-                    else
-                        printf("ERROR : The selected board is not a HDMI or DVI board\n");
-
-                    /* Close board handle */
-                    VHD_CloseBoardHandle(BoardHandle);
-                }
-                else
-                    printf("ERROR : Cannot open DELTA board handle.\n");
-            }
-            else
-                printf("No DELTA board detected, exiting...\n");
-        }
-        else
-            printf("ERROR : Cannot query VideoMaster information. \n");
-    }
-}
-
-inline void deltaCast::recvHDMI()
-{
+    VHD_StopStream(streamHdl->getHandle());
+    active = false;
 }
 
 inline std::size_t deltaCast::getSampleRate() const 
 {
-    const int code = HDMIAudioInfoFrame.SamplingFrequency;
+    const int code{ HDMIAudioInfoFrame.SamplingFrequency };
     std::size_t sampleRate{};
     switch (code)
     {
     case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_REF_STREAM_HEADER:
+    {
         //We need to do a reference to stream header.
-        const int codeRef = HDMIAudioAESSts.SamplingFrequency;
+        const int codeRef{ HDMIAudioAESSts.SamplingFrequency };
         switch (codeRef)
         {
         case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_44100HZ:
@@ -411,6 +150,7 @@ inline std::size_t deltaCast::getSampleRate() const
             break;
         }
         break;
+    }
     case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_32000HZ:
         sampleRate = 32000;
         break;
@@ -440,15 +180,17 @@ inline std::size_t deltaCast::getSampleRate() const
     
     
 }
-
 inline std::uint8_t deltaCast::getChannelNumbers() const
 {
     std::uint8_t channelNumber{};
     const int code = HDMIAudioInfoFrame.ChannelCount;
-    switch (code) {
+    switch (code) 
+    {
     case VHD_DV_AUDIO_INFOFRAME_CHANNEL_COUNT_REF_STREAM_HEADER:
+    {
         channelNumber = HDMIAudioAESSts.ChannelNb;
         break;
+    }
     case VHD_DV_AUDIO_INFOFRAME_CHANNEL_COUNT_2:
         channelNumber = 2;
         break;
@@ -476,193 +218,109 @@ inline std::uint8_t deltaCast::getChannelNumbers() const
     }
     return channelNumber;
 }
-inline void deltaCast::recvHDMI()
+
+inline void deltaCast::streamConfig()
 {
-    
     VHD_DV_MODE DvMode{ NB_VHD_DV_MODES };
     do
     {
-        if (VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_MODE, (ULONG*)&DvMode))
-            throw std::runtime_error("ERROR : Cannot detect if incoming mode is HDMI.");
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_MODE, (ULONG*)&DvMode);
     } while (DvMode != VHD_DV_MODE_HDMI);
 
     if (DvMode == VHD_DV_MODE_HDMI)
     {
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_BUFFER_PACKING , VHD_BUFPACK_VIDEO_RGB_32);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
-
-            /* Get auto-detected resolution */
-            VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH, &Width);
-            if (Result == VHDERR_NOERROR)
-            {
-                Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_HEIGHT, &Height);
-                if (Result == VHDERR_NOERROR)
-                {
-                    Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_INTERLACED, (ULONG*)&Interlaced);
-                    if (Result == VHDERR_NOERROR)
-                    {
-                        Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_REFRESH_RATE, &RefreshRate);
-                        if (Result == VHDERR_NOERROR)
-                        {
-                            if (IsHdmiBoard)
-                                Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_INPUT_CS, (ULONG*)&InputCS);
-
-                            if (Result == VHDERR_NOERROR)
-                            {
-                                if (IsHdmiBoard)
-                                    Result = VHD_GetStreamProperty(StreamHandle, VHD_DV_SP_PIXEL_CLOCK, &PxlClk);
-
-                                if (Result == VHDERR_NOERROR)
-                                {
-                                    std::print("Incoming graphic resolution : %ux%u (%s)\n", Width, Height, Interlaced ? "Interlaced" : "Progressive");
-
-                                    /* Configure stream. Only VHD_DV_SP_ACTIVE_WIDTH, VHD_DV_SP_ACTIVE_HEIGHT,
-                                    VHD_DV_SP_INTERLACED and VHD_DV_SP_REFRESH_RATE properties are required for HDMI */
-
-                                    VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_WIDTH, Width);
-                                    VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_ACTIVE_HEIGHT, Height);
-                                    VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_INTERLACED, Interlaced);
-                                    VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_REFRESH_RATE, RefreshRate);
-
-                                    /* VHD_DV_SP_INPUT_CS and VHD_DV_SP_PIXEL_CLOCK are required for DELTA-h4k only */
-                                    if (boardType == VHD_BOARDTYPE_HDMI)
-                                    {
-                                        VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_INPUT_CS, InputCS);
-                                        VHD_SetStreamProperty(StreamHandle, VHD_DV_SP_PIXEL_CLOCK, PxlClk);
-                                    }
-
-                                    /* Start stream */
-                                    Result = VHD_StartStream(StreamHandle);
-                                    if (Result == VHDERR_NOERROR)
-                                    {
-                                        std::print("Reception started\n");
-
-                                        /* Reception loop */
-                                        while (true)
-                                        {
-                                            /* Try to lock next slot */
-                                            Result = VHD_LockSlotHandle(StreamHandle, &SlotHandle);
-
-                                            if (Result == VHDERR_NOERROR)
-                                            {
-                                                Result = VHD_GetSlotBuffer(SlotHandle, VHD_DV_BT_VIDEO, &pBuffer, &BufferSize);
-                                                if (Result == VHDERR_NOERROR)
-                                                {
-                                                    /* Do RX data processing here on pBuffer */
-                                                }
-                                                else
-                                                {
-                                                    std::print("ERROR : Cannot get video slot buffer.\n");
-                                                    break;
-                                                }
-                                                if (IsHdmiBoard)
-                                                {
-                                                    /* Do RX data processing here on pBuffer */
-                                                    Result = VHD_GetSlotDvAudioInfo(SlotHandle, &HDMIAudioType, &HDMIAudioInfoFrame, &HDMIAudioAESSts);
-
-                                                    if (Result == VHDERR_NOERROR)
-                                                    {
-                                                        if (HDMIAudioType != VHD_DV_AUDIO_TYPE_NONE)
-                                                        {
-                                                            BufferSize = 0;
-                                                            if (HDMIAudioAESSts.LinearPCM == VHD_DV_AUDIO_AES_SAMPLE_STS_LINEAR_PCM_SAMPLE)
-                                                            {
-                                                                VHD_SlotExtractDvPCMAudio(SlotHandle, VHD_DVAUDIOFORMAT_16, 0x3, nullptr, &BufferSize);
-                                                                pAudioBuffer = new UBYTE[BufferSize];
-                                                                Result = VHD_SlotExtractDvPCMAudio(SlotHandle, VHD_DVAUDIOFORMAT_16, 0x3, pAudioBuffer, &BufferSize);
-                                                                if (Result == VHDERR_NOERROR)
-                                                                {
-                                                                    auto temp = composition16bit(pAudioBuffer, BufferSize);
-                                                                    std::vector<float> floatData(temp.size());
-
-                                                                    src_short_to_float_array(temp.data(), floatData.data(), temp.size());
-
-                                                                    (*audio)[0].push(std::move(floatData), getSampleRate(), getChannelNumbers());
-
-                                                                }
-                                                                else
-                                                                {
-                                                                    std::print("ERROR : Cannot get PCM audio slot buffer. \n");
-                                                                    break;
-                                                                }
-                                                            }
-                                                            else
-                                                            {
-                                                                VHD_SlotExtractDvNonPCMAudio(SlotHandle, nullptr, &BufferSize);
-                                                                pAudioBuffer = new UBYTE[BufferSize];
-                                                                Result = VHD_SlotExtractDvNonPCMAudio(SlotHandle, pAudioBuffer, &BufferSize);
-                                                                if (Result == VHDERR_NOERROR)
-                                                                {
-                                                                    /* Do Non-PCM audio data processing here on pAudioBufferPacked_UB */
-                                                                }
-                                                                else
-                                                                {
-                                                                    std::print("ERROR : Cannot get Non-PCM audio slot buffer. \n");
-                                                                    break;
-                                                                }
-                                                            }
-
-                                                            if (pAudioBuffer)
-                                                            {
-                                                                delete[] pAudioBuffer;
-                                                                pAudioBuffer = nullptr;
-                                                            }
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        std::print("ERROR : Cannot get HDMI audio info. \n");
-                                                        break;
-                                                    }
-                                                }
-
-                                                /* Unlock slot */
-                                                VHD_UnlockSlotHandle(SlotHandle);
-
-                                                /* Print some statistics */
-                                                VHD_GetStreamProperty(StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &NbFramesRecv);
-                                                VHD_GetStreamProperty(StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &NbFramesDropped);
-                                                printf("%u frames received (%u dropped)            \r", NbFramesRecv, NbFramesDropped);
-                                                fflush(stdout);
-                                            }
-                                            else if (Result != VHDERR_TIMEOUT)
-                                            {
-                                                std::print("ERROR : Cannot lock slot on RX0 stream. \n");
-                                                break;
-                                            }
-                                        }
-
-                                        std::print("");
-
-                                        /* Stop stream */
-                                        VHD_StopStream(StreamHandle);
-                                    }
-                                    else
-                                        printf("ERROR : Cannot start RX0 stream on DV board handle. \n");
-                                }
-                                else
-                                    printf("ERROR : Cannot detect incoming pixel clock from RX0. \n");
-                            }
-                            else
-                                printf("ERROR : Cannot detect incoming color space from RX0. \n");
-                        }
-                        else
-                            printf("ERROR : Cannot detect incoming refresh rate from RX0. \n");
-                    }
-                    else
-                        printf("ERROR : Cannot detect if incoming stream from RX0 is interlaced or progressive. \n");
-                }
-                else
-                    printf("ERROR : Cannot detect incoming active height from RX0. \n");
-            }
-            else
-                printf("ERROR : Cannot detect incoming active width from RX0. \n");
-        }
-        else
-            printf("ERROR : Cannot detect if incoming mode is HDMI. \n");
+        /* Get auto-detected resolution */
+        ULONG Height{ 0 }, Width{ 0 }, RefreshRate{ 0 }, PxlClk{ 0 };
+        BOOL32 Interlaced{ FALSE };
+        VHD_DV_CS InputCS{};
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH ,         &Width);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT,         &Height);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , (ULONG*)&Interlaced);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE ,         &RefreshRate);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , (ULONG*)&InputCS);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  ,         &PxlClk);
+        std::print("Incoming graphic resolution : {0}x{1} ({2})\n", Width, Height, Interlaced ? "Interlaced" : "Progressive");
+        /* Configure stream. Only VHD_DV_SP_ACTIVE_WIDTH, VHD_DV_SP_ACTIVE_HEIGHT,
+        VHD_DV_SP_INTERLACED and VHD_DV_SP_REFRESH_RATE properties are required for HDMI */
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH , Width);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT, Height);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , Interlaced);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE , RefreshRate);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , InputCS);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  , PxlClk);
     }
     else
-        printf("ERROR : Cannot configure RX0 stream primary mode. \n");
+        throw std::runtime_error("ERROR : Cannot detect if incoming mode is HDMI.");
+}
+
+inline void deltaCast::startStream()
+{
+    
+    HANDLE slotHandle{ nullptr };
+    BYTE* pBuffer{ nullptr };
+    BYTE* pAudioBuffer{ nullptr };
+    ULONG  bufferSize{ 0 };
+    audioQueue<float> queue;
+    audio->push_back(queue);
+
+
+    /* Start stream */
+    VHD_StartStream(streamHdl->getHandle());
+    std::print("Reception started\n");
+    active = true;
+    bool set{ false };
+    /* Reception loop */
+    while (true)
+    {
+        /* Try to lock next slot */
+        auto Result = VHD_LockSlotHandle(streamHdl->getHandle(), &slotHandle);
+        if (Result == VHDERR_NOERROR)
+        {
+            VHD_DV_AUDIO_TYPE HDMIAudioType{};
+
+            VHD_GetSlotBuffer     (slotHandle, VHD_DV_BT_VIDEO, &pBuffer, &bufferSize);
+            VHD_GetSlotDvAudioInfo(slotHandle, &HDMIAudioType, &HDMIAudioInfoFrame, &HDMIAudioAESSts);
+
+            if (HDMIAudioType != VHD_DV_AUDIO_TYPE_NONE)
+            {
+                if (HDMIAudioAESSts.LinearPCM == VHD_DV_AUDIO_AES_SAMPLE_STS_LINEAR_PCM_SAMPLE)
+                {
+                    VHD_SlotExtractDvPCMAudio(slotHandle, VHD_DVAUDIOFORMAT_16, 0x3, nullptr, &bufferSize);
+                    pAudioBuffer = new UBYTE[bufferSize];
+                    VHD_SlotExtractDvPCMAudio(slotHandle, VHD_DVAUDIOFORMAT_16, 0x3, pAudioBuffer, &bufferSize);
+                    auto temp = composition16bit(pAudioBuffer, bufferSize);
+                    std::vector<float> floatData(temp.size());
+                    src_short_to_float_array(temp.data(), floatData.data(), temp.size());
+
+                    if (!set)
+                    {
+                        (*audio)[0].setCapacity(floatData.size() + 10);
+                        set = true;
+                    }
+
+                    (*audio)[0].push(std::move(floatData), getSampleRate(), getChannelNumbers());
+                    
+                    
+                }
+                if (pAudioBuffer)
+                {
+                    delete[] pAudioBuffer;
+                    pAudioBuffer = nullptr;
+                }
+            }
+
+            /* Unlock slot */
+            VHD_UnlockSlotHandle(slotHandle);
+            /* Print some statistics
+            VHD_GetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_SLOTS_COUNT, &NbFramesRecv);
+            VHD_GetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_SLOTS_DROPPED, &NbFramesDropped);*/
+        }
+        else if (Result != VHDERR_TIMEOUT)
+            throw std::runtime_error("ERROR : Cannot lock slot on RX0 stream.");
+    }
+}
 
 inline std::vector<short> deltaCast::composition16bit(const std::uint8_t* sourceAudio,
                                                       const std:: size_t  sourceSize)
@@ -673,9 +331,9 @@ inline std::vector<short> deltaCast::composition16bit(const std::uint8_t* source
     if (sourceSize % 2)
         throw std::invalid_argument("HDMI Audio Error : Invalid buffer size for 16 bit audio data.");
     else
-        for (auto i = 0, j = 0; i < sourceSize; i += 2, ++j)
-            combined16bit[j] = static_cast<std::uint32_t>(sourceAudio[i    ]  << 8) |
-                               static_cast<std::uint32_t>(sourceAudio[i + 1]);
+        for (auto i {0}, j {0}; i < sourceSize; i += 2, ++j)
+            combined16bit[j] = static_cast<std::uint32_t>(sourceAudio[i + 1]  << 8) |
+                               static_cast<std::uint32_t>(sourceAudio[i    ]);
     
     return combined16bit;
 }

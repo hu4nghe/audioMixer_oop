@@ -118,7 +118,7 @@
       <AdditionalDependencies>$(SolutionDir)lib\portaudio_x64.lib;$(SolutionDir)lib\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\samplerate.lib;$(SolutionDir)lib\sndfile.lib;$(SolutionDir)lib\VideoMasterHD.lib;$(SolutionDir)lib\VideoMasterHD_Audio.lib;$(SolutionDir)lib\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\VideoMasterHD_VbiData.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Lib>
-      <AdditionalDependencies>$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\portaudio\portaudio_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\portaudio\portaudio_x64.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Audio.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_VbiData.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
