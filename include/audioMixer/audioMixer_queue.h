@@ -36,10 +36,10 @@ struct outputParameter
 /**
  * @brief
  *
- * @tparam T audio data type : 32bit float[-1;1], 24bit/20bit int or 16bit short[-32768;32767].
+ * @tparam T audio data type : 32bit float[-1;1], 16bit short[-32768;32767].
  */
 template<typename T>
-concept audioType = std::same_as<T, std::int16_t> || std::same_as<T, std::int32_t> || std::same_as<T, float>;
+concept audioType = std::same_as<T, std::int16_t> || std::same_as<T, float>;
 
 template <audioType T>
 class audioQueue 
@@ -52,23 +52,18 @@ private :
               std::vector<T> queue;
             outputParameter  outConfig;                                   
 public : 
-    //Constructors
     audioQueue();
-    audioQueue(outputParameter outputConfig);
-
-    audioQueue(const audioQueue<T>&  other);
-    audioQueue(      audioQueue<T>&& other) noexcept;
-
-    //Push & pop
-    bool push(      std::vector<T>&& data,
-              const std::uint32_t    inputSampleRate,
-              const std:: uint8_t    inputChannelNumber);
-    bool pop (                T*&    data,
-              const std::  size_t    frames,
-              const          bool    mode);
+    audioQueue(       outputParameter outputConfig);
+    audioQueue(const  audioQueue<T>&  other);
+    audioQueue(       audioQueue<T>&& other) noexcept;
+    bool push (      std::vector<T>&& data,
+               const std::uint32_t    inputSampleRate,
+               const std:: uint8_t    inputChannelNumber);
+    bool pop  (                T*&    data,
+               const std::  size_t    frames,
+               const          bool    mode);
 private :
-    void clear();
-    //Enqueue,dequeue 
+                  void clear  ();
     [[nodiscard]] bool enqueue(const    T   value);
     [[nodiscard]] bool dequeue(         T&  value,
                                const bool   mode);
@@ -219,13 +214,23 @@ void audioQueue<T>::resample(      std::vector<T>& data,
     const auto newSize       = static_cast<size_t>(data.size() * resampleRatio);
     const auto frames        = data.size() / inputChannelNumber;
 
-    std::vector<T> temp(newSize);//new vector for resampling output.
+    std::vector<float> floatData;
 
+    if (std::is_same<T, short>::value)
+    {
+        floatData.resize(data.size());
+        src_short_to_float_array(data.data(), floatData.data(), data.size());
+    }
+    else
+        floatData = std::move(data);
+    
+
+    std::vector<float> temp(newSize);//new vector for resampling output.
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, static_cast<int>(inputChannelNumber), nullptr);
 
     SRC_DATA srcData{};
     srcData.end_of_input  = true;
-    srcData.data_in       = data.data();
+    srcData.data_in       = floatData.data();
     srcData.data_out      = temp.data();
     srcData.input_frames  = static_cast<long>(frames);
     srcData.output_frames = static_cast<long>(frames * resampleRatio);
