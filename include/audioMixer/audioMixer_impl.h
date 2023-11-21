@@ -139,7 +139,6 @@ void audioMixer::PaErrorCheck(const PaError& err)
 
 inline void audioMixer::PaStart()
 {
-	std::this_thread::sleep_for(std::chrono::seconds(8));
 	Pa_StartStream(PaStreamOut);
 }
 

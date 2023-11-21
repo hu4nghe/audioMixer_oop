@@ -14,8 +14,12 @@ protected:
     outputParameter                outputConfig;
     bool                           active;
 public:
-    audioMixerModule_base();
-    audioMixerModule_base(const outputParameter& outputCfg);
+    audioMixerModule_base() 
+        :   active(false) {};
+    audioMixerModule_base(const outputParameter& outputCfg) 
+        :   active(false), 
+            outputConfig(outputCfg)
+    { audio = std::make_shared<std::vector<audioQueue<float>>>(); }
 
     //any copy or move of a audioMixer module is NOT possible!
     audioMixerModule_base           (const audioMixerModule_base&  other) = delete;
@@ -29,10 +33,8 @@ public:
     virtual void stop () = 0;
 
     auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio; }
-
     [[nodiscard]] bool isActive() const { return active; }
 };
 
 using module = audioMixerModule_base;
-
 #endif//AUDIO_BASE_H
