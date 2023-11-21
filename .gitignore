@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/lib/audioMixer/audio_mixer.idb
+/lib/audioMixer/audio_mixer.lib
