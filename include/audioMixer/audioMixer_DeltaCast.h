@@ -53,7 +53,6 @@ public:
 };
 #pragma endregion
 
-#pragma region Delta Cast Module
 class deltaCast : public audioMixerModule_base
 {
     //handles
@@ -77,9 +76,8 @@ public:
     std::uint8_t getChannelNumbers() const;
     
 };
-#pragma endregion
 
-#pragma region IMPL Delta Cast Module
+#pragma region IMPL
 
                     deltaCast::deltaCast         (const outputParameter& outputCfg)
 	:	module(outputCfg)
@@ -321,7 +319,7 @@ inline         auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudi
     
     return shortArr;
 }
-
-
 #pragma endregion
+//IMPL Delta Cast Module
+
 #endif //AUDIOMIXER_DELTACAST_H

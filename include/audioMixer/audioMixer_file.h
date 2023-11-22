@@ -97,4 +97,5 @@ void soundFile::readFile  ()
 	return;
 }
 #pragma endregion
+//IMPL soundFile
 #endif//AUDIOMIXER_FILE_H

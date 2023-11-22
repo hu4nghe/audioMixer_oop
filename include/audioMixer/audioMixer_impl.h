@@ -41,7 +41,7 @@ public:
 	void startStream();
 };
 
-#pragma region IMPL audioMixer
+#pragma region IMPL
 template<inputMod_t U>
 inline void audioMixer::inputModuleInit	  ()																
 {
@@ -145,5 +145,4 @@ inline void audioMixer::PaStop			  ()
 }
 #pragma endregion
 //IMPL audioMixer
-
 #endif//AUDIOMIXER_IMPL_H

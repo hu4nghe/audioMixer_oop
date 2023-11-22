@@ -180,5 +180,5 @@ void NDI::recvAudio()
 	}
 }
 #pragma endregion
-
+//IMPL NDI Recv
 #endif//NDI_RECV_MODULE_H

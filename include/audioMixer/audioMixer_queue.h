@@ -87,6 +87,7 @@ public :
     inline void setMinBuffer (const std::  size_t newMinBuffer)    { outConfig.minimumElement = newMinBuffer;     }
            void setCapacity  (const std::  size_t newCapacity);
 };
+
 #pragma region IMPL
 #pragma region Constructors
 /**
