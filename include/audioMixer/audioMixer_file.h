@@ -86,7 +86,7 @@ void soundFile::readAudioFile()
 		audioQueue<float> sndQueue(outputConfig);
 		std::vector<float> audioData(temp, temp + bufferSize);
 
-		sndQueue.push(std::move(audioData), i.samplerate(), i.channels());
+		sndQueue.push(audioData, i.samplerate(), i.channels());
 		delete[] temp;
 
 		audio->push_back(std::move(sndQueue));

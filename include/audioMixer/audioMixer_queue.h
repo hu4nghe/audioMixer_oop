@@ -56,7 +56,7 @@ public :
     audioQueue(       outputParameter outputConfig);
     audioQueue(const  audioQueue<T>&  other);
     audioQueue(       audioQueue<T>&& other) noexcept;
-    bool push (      std::vector<T>&& data,
+    bool push (      std::vector<T>&  data,
                const std::uint32_t    inputSampleRate,
                const std:: uint8_t    inputChannelNumber);
     bool pop  (                T*&    data,
@@ -219,11 +219,10 @@ void audioQueue<T>::resample(      std::vector<T>& data,
     if (std::is_same<T, short>::value)
     {
         floatData.resize(data.size());
-        src_short_to_float_array(data.data(), floatData.data(), data.size());
+        src_short_to_float_array(reinterpret_cast<const short*>(data.data()), floatData.data(), data.size());
     }
     else
         floatData = std::move(data);
-    
 
     std::vector<float> temp(newSize);//new vector for resampling output.
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, static_cast<int>(inputChannelNumber), nullptr);
@@ -238,7 +237,14 @@ void audioQueue<T>::resample(      std::vector<T>& data,
 
     src_process(srcState, &srcData);
     src_delete (srcState);
-    data = std::move(temp);
+
+    if (std::is_same<T, short>::value)
+    {
+        data.resize(temp.size());
+        src_float_to_short_array(temp.data(), reinterpret_cast<short*>(data.data()), newSize);
+    }
+    else
+        data = std::move(temp);
 }
 
 /**
@@ -275,7 +281,7 @@ void audioQueue<T>::channelConvert(      std::vector<T>& data,
  * @return false              If operation failed due to no enough space.
  */
 template<audioType T>
-bool audioQueue<T>::push(      std::vector<T>&& data,
+bool audioQueue<T>::push(      std::vector<T>&  data,
                          const std::uint32_t    inputSampleRate,
                          const std:: uint8_t    inputChannelNumber)
 {

@@ -295,7 +295,7 @@ inline void deltaCast::startStream()
                     std::vector<float> floatData(temp.size());
                     src_short_to_float_array(temp.data(), floatData.data(), temp.size());
 
-                    (*audio)[0].push(std::move(floatData), getSampleRate(), getChannelNumbers());
+                    (*audio)[0].push(floatData, getSampleRate(), getChannelNumbers());
                 }
                 if (pAudioBuffer)
                 {
