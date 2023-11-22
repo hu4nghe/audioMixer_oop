@@ -10,10 +10,10 @@
 #pragma region Output parameters class
 
 /*default values*/
-constexpr std::size_t defaultSampleRate = 44100;
+constexpr std::size_t defaultSampleRate = 48000;
 constexpr std::size_t defaultChannelNum = 2;
-constexpr std::size_t defaultBufferSize = 44100;
-constexpr std::size_t defaultMinBuffer  = 44;
+constexpr std::size_t defaultBufferSize = 480000;
+constexpr std::size_t defaultMinBuffer  = 0;
 
 struct outputParameter
 {
@@ -34,7 +34,7 @@ struct outputParameter
 #pragma endregion
 
 /**
- * @brief
+ * @brief audio sample data type.
  *
  * @tparam T audio data type : 32bit float[-1;1], 16bit short[-32768;32767].
  */

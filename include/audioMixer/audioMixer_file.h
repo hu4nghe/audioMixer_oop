@@ -1,12 +1,13 @@
 #ifndef AUDIOMIXER_FILE_H
 #define AUDIOMIXER_FILE_H
 
+#include "sndfile.hh"
+
 #include <filesystem>
 #include <iostream>
-#include <print>
 
-#include "audioMixer_queue.h"
-#include "sndfile.hh"
+#include "audioMixer_base.h"
+
 
 namespace fs = std::filesystem;
 
@@ -32,16 +33,19 @@ inline soundFile::soundFile(const outputParameter& outputCfg)
 inline void soundFile::start()
 {
 	std::print("file Module is activated.\n");
-	std::jthread receiveThread([this](){ this->selectAudioFile();
-										 this->readAudioFile  (); });
+	active = true;
+	this->selectAudioFile();
+	this->readAudioFile  ();
+	while(!this->audio->empty()){}
 }
 inline void soundFile::stop()
 {
 	std::print("file Module is stopped.\n");
+	active = false;
 }
 void soundFile::selectAudioFile()
 {
-	std::print("Please enter the path of the sound file, enter end to confirm.");
+	std::print("Please enter the path of the sound file, enter end to confirm.\n");
 	std::string filePathStr;
 	do
 	{

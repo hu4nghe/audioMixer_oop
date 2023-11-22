@@ -4,9 +4,8 @@
 #include "VideoMasterHD_Core.h"
 #include "VideoMasterHD_Dv.h"
 #include "VideoMasterHD_Dv_Audio.h"
-#include "audioMixer_base.h"
 
-#include <print>
+#include "audioMixer_base.h"
 
 #pragma region Handles
 class boardHandle
@@ -100,8 +99,8 @@ deltaCast::deltaCast(const outputParameter& outputCfg)
 
 inline void deltaCast::start()
 {
-    std::jthread receiveThread([this]() { this->streamConfig();
-                                          this->startStream (); });
+    this->streamConfig();
+    this->startStream ();
 }
 inline void deltaCast::stop()
 {
@@ -242,7 +241,6 @@ inline void deltaCast::streamConfig()
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE ,         &RefreshRate);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , (ULONG*)&InputCS);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  ,         &PxlClk);
-        std::print("Incoming graphic resolution : {0}x{1} ({2})\n", Width, Height, Interlaced ? "Interlaced" : "Progressive");
         /* Configure stream.*/
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH , Width);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT, Height);
@@ -268,7 +266,7 @@ inline void deltaCast::startStream()
 
     /* Start stream */
     VHD_StartStream(streamHdl->getHandle());
-    std::print("Reception started\n");
+    std::print("HDMI audio reception started\n");
     active = true;
     bool set{ false };
     /* Reception loop */

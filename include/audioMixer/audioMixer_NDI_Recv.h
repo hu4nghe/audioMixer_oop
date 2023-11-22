@@ -1,12 +1,12 @@
 #ifndef AUDIOMIXER_NDI_RECV_H
 #define AUDIOMIXER_NDI_RECV_H
 
+#include "Processing.NDI.Lib.h"
+
 #include <iostream>
-#include <print>
-#include <thread>
 
 #include "audioMixer_base.h"
-#include "Processing.NDI.Lib.h"
+
 
 class NDIFinder
 {
@@ -86,14 +86,15 @@ NDI::NDI(const outputParameter outputCfg)
 		module(outputCfg) {}
 void NDI::start()
 {
-	if (!NDIlib_initialize()) throw std::logic_error("Cannot run NDI.");
+	if (!NDIlib_initialize()) 
+		throw std::runtime_error("Cannot run NDI.");
 	else
 	{
 		std::print("NDI Module is activated.\n");
 		active = true;
 	}
-	std::jthread receiveThread([this](){ this->sourceSearch(); 
-										 this->recvAudio   (); });
+	this->sourceSearch(); 
+	this->recvAudio   ();
 
 }
 void NDI::stop()
