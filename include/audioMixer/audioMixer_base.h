@@ -13,8 +13,8 @@ protected:
     //audioData
     std::shared_ptr<std::vector<audioQueue<float>>> audio;
     //Config, status
-    outputParameter                outputConfig;
-    bool                           active;
+    outputParameter outputConfig;
+    bool            active;
 public:
     audioMixerModule_base() 
         :   active(false) {};
@@ -30,13 +30,20 @@ public:
     audioMixerModule_base& operator=(      audioMixerModule_base&& other) = delete;
 
     virtual ~audioMixerModule_base() {}
-
     virtual void start() = 0;
     virtual void stop () = 0;
 
-    auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio; }
-    [[nodiscard]] bool isActive() const { return active; }
+    [[nodiscard]] auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio; }
+    [[nodiscard]] bool isActive() const                                                    { return active; }
 };
-
 using module = audioMixerModule_base;
+
+/**
+ * @brief
+ *
+ * @tparam T input module type : all derivated class of audioMixerModule_base, aka module.
+ */
+template<typename U>
+concept inputMod_t = std::is_base_of<module, U>::value;
+
 #endif//AUDIO_BASE_H

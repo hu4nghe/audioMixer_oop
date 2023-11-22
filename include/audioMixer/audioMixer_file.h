@@ -13,12 +13,11 @@ namespace fs = std::filesystem;
 
 class soundFile : public module
 {
-	friend class audioMixer;
 	/*Sound file path*/
-	std::vector<fs::path>           pathList;
+	std::vector<fs::path> pathList;
 	
-	void selectAudioFile();
-	void readAudioFile  ();
+	void selectFile();
+	void readFile  ();
 
 public:
 	soundFile(const outputParameter& outputCfg);		
@@ -28,22 +27,22 @@ public:
 };
 
 #pragma region IMPL
-inline soundFile::soundFile(const outputParameter& outputCfg)
+	 soundFile::soundFile (const outputParameter& outputCfg)
 	:	module(outputCfg) {}
-inline void soundFile::start()
+void soundFile::start	  ()
 {
 	std::print("file Module is activated.\n");
 	active = true;
-	this->selectAudioFile();
-	this->readAudioFile  ();
+	this->selectFile();
+	this->readFile  ();
 	while(!this->audio->empty()){}
 }
-inline void soundFile::stop()
+void soundFile::stop	  ()
 {
 	std::print("file Module is stopped.\n");
 	active = false;
 }
-void soundFile::selectAudioFile()
+void soundFile::selectFile()
 {
 	std::print("Please enter the path of the sound file, enter end to confirm.\n");
 	std::string filePathStr;
@@ -71,7 +70,7 @@ void soundFile::selectAudioFile()
 		}
 	} while (true);
 }
-void soundFile::readAudioFile()
+void soundFile::readFile  ()
 {
 	std::vector<SndfileHandle> fileHandleList;
 	for (auto& i : pathList)

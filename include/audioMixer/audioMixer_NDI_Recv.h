@@ -36,8 +36,8 @@ public:
 	{ 
 		NDIlib_find_destroy(finder); 
 	}
-	
-   auto findSources(std::uint32_t timeout) -> std::vector<NDIlib_source_t>
+
+    auto findSrc(std::uint32_t timeout) -> std::vector<NDIlib_source_t>
 	{
 		const NDIlib_source_t* source		= nullptr;
 				std::uint32_t  sourceNumber	= 0;
@@ -65,14 +65,11 @@ public:
 
 class NDI : public module
 {
-	friend class audioMixer;
-
 	/*NDI Receivers*/
 	std::vector<NDIlib_recv_instance_t>	recvList;
-	
-	
-	void sourceSearch();
-	void recvAudio	 ();
+
+	void srcSearch();
+	void recvAudio();
 public:
 	NDI(const outputParameter outputCfg);
 
@@ -81,10 +78,10 @@ public:
 };
 
 #pragma region IMPL
-NDI::NDI(const outputParameter outputCfg)
+	 NDI::NDI	   (const outputParameter outputCfg)
 	:	recvList (0),
 		module(outputCfg) {}
-void NDI::start()
+void NDI::start	   ()
 {
 	if (!NDIlib_initialize()) 
 		throw std::runtime_error("Cannot run NDI.");
@@ -93,11 +90,11 @@ void NDI::start()
 		std::print("NDI Module is activated.\n");
 		active = true;
 	}
-	this->sourceSearch(); 
+	this->srcSearch(); 
 	this->recvAudio   ();
 
 }
-void NDI::stop()
+void NDI::stop	   ()
 {
 	for (auto& i : recvList)
 		NDIlib_recv_destroy(i);
@@ -107,26 +104,14 @@ void NDI::stop()
 	std::print("NDI Module is stopped.\n");
 	active = false;
 }
-
-/**
-	* @brief try to search all NDI audio source available and let user select sources wanted.
-	*
-	* type ip adresse of sources to select.
-	* type end to confirm.
-	* type "all" to select all sources available.
-	*
-	* @return true  if at least 1 NDI source is found,
-	* @return false if failed to search NDI sources.
-	*
-	*/
-void NDI::sourceSearch()
+void NDI::srcSearch()
 {
 	if (!active)
 		throw std::logic_error("NDI lib is not running !");
 
 	constexpr auto timeout = 1000;
 	NDIFinder audioFinder;
-	auto sourcesFound = audioFinder.findSources(timeout);
+	auto sourcesFound = audioFinder.findSrc(timeout);
 
 	//print all sources found
 	std::print("NDI sources list:\n");
@@ -170,10 +155,6 @@ void NDI::sourceSearch()
 	//create a audioQueue for each selected NDI receiver.
 	audio->resize(recvList.size(), audioQueue<float>(outputConfig));
 }
-/**
-* @brief try to capture NDI AUDIO data from every NDI receiver in recvList.
-*
-*/
 void NDI::recvAudio()
 {
 	while (true)
