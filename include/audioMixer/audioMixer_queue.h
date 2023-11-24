@@ -45,12 +45,12 @@ template <audioType T>
 class audioQueue 
 {
 private :
-    std::atomic<std::size_t> head;
-    std::atomic<std::size_t> tail;                
-    std::atomic<std::size_t> count;
+    std::atomic<std::  size_t> head;
+    std::atomic<std::  size_t> tail;                
+    std::atomic<std::  size_t> count;
+                std::vector<T> queue;
 
-              std::vector<T> queue;
-            outputParameter  outConfig;                                   
+    outputParameter outConfig;                                   
 public : 
     audioQueue();
     audioQueue(       outputParameter outputConfig);
@@ -59,7 +59,7 @@ public :
     bool push (      std::vector<T>&  data,
                const std::uint32_t    inputSampleRate,
                const std:: uint8_t    inputChannelNumber);
-    bool pop  (                T*&    data,
+    bool pop  (                  T*&  data,
                const std::  size_t    frames,
                const          bool    mode);
 private :
