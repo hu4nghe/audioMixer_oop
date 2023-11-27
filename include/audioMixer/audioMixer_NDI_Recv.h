@@ -58,29 +58,30 @@ public:
 
 class NDIReceiver
 {
-	NDIlib_recv_instance_t	receiver   {};
+	NDIlib_recv_instance_t receiver;
 public:
-	NDIReceiver() = default;
-	NDIReceiver(const NDIlib_source_t& source)
+	NDIReceiver(NDIlib_recv_instance_t& source)
+		:	receiver(source)
 	{
-		NDIlib_recv_create_v3_t recvConfig {};
+		/*
+		NDIlib_recv_create_v3_t recvConfig;
 		recvConfig.p_ndi_recv_name = source.p_ndi_name;
 		recvConfig.source_to_connect_to = source;
 		receiver = NDIlib_recv_create_v3(&recvConfig);
 		if (receiver == nullptr)
-			throw std::runtime_error("Failed to create NDI receiver.");
+			throw std::runtime_error("Failed to create NDI receiver.");*/
 	}
-   
 
 	template<audioType T>
 	void getAudio(audioQueue<T>& queue)
 	{
-		NDIlib_audio_frame_v2_t audioFrame {};
+		NDIlib_audio_frame_v2_t audioFrame;
 		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioFrame, nullptr, 0) == NDIlib_frame_type_audio)
 		{
-			const auto dataSize	   { audioFrame.no_samples * audioFrame.no_channels };
+			std::print("audio data received.\n");
+			/*const auto dataSize	   { audioFrame.no_samples * audioFrame.no_channels };
 				  
-
+			
 			if (std::is_same<T, float>::value)
 			{
 				NDIlib_audio_frame_interleaved_32f_t audio32f {};
@@ -98,7 +99,7 @@ public:
 				std::vector<T> audioVec(audio16s.p_data, audio16s.p_data + dataSize);
 				if (queue.push(audioVec, audio16s.sample_rate, audio16s.no_channels))
 					std::print("Push failed : no enough space in the queue !\n");
-			}
+			}*/
 		}
 		else
 			std::print("No audio data is received.\n");
@@ -166,7 +167,11 @@ void NDI::srcSearch()
 		{
 			if (url == i.p_url_address || selectAll)
 			{
-				recvList.push_back(NDIReceiver(i));
+				NDIlib_recv_create_v3_t recvConfig;
+				recvConfig.p_ndi_recv_name = i.p_ndi_name;
+				recvConfig.source_to_connect_to = i;
+				auto receiver = NDIlib_recv_create_v3(&recvConfig);
+				recvList.push_back(receiver);
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
 			}
