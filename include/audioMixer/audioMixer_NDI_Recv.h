@@ -5,7 +5,10 @@
 
 #include <iostream>
 #include <ranges>
+<<<<<<< HEAD
 
+=======
+>>>>>>> historic
 
 #include "audioMixer_base.h"
 
@@ -60,6 +63,7 @@ class NDIReceiver
 {
 	NDIlib_recv_instance_t receiver;
 public:
+<<<<<<< HEAD
 	NDIReceiver(NDIlib_recv_instance_t& source)
 		:	receiver(source)
 	{
@@ -106,10 +110,46 @@ public:
 	}
 };
 
+=======
+	NDIReceiver(const NDIlib_source_t& src)
+	{
+		NDIlib_recv_create_v3_t recvConfig;
+		recvConfig.p_ndi_recv_name = src.p_ndi_name;
+		recvConfig.source_to_connect_to = src;
+		receiver = NDIlib_recv_create_v3(&recvConfig);
+	}
+
+	void getAudio(audioQueue<float>& audio)
+	{
+		NDIlib_audio_frame_v2_t audioInput;
+		//receive only audio
+		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
+		{
+			std::print("received.\n");
+			/*
+			const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
+			NDIlib_audio_frame_interleaved_32f_t audio32f;
+			audio32f.p_data = new float[dataSize];
+			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio32f);
+			std::vector<float> audioData(audio32f.p_data, audio32f.p_data + dataSize);
+			if (!audio.push(audioData, audio32f.sample_rate, audio32f.no_channels))
+				std::print("No more space in the queue!\n");
+
+			delete[] audio32f.p_data;*/
+		}
+	}
+};
+>>>>>>> historic
 class NDI : public module
 {
 	/*NDI Receivers*/
 	std::vector<NDIReceiver> recvList;
+<<<<<<< HEAD
+=======
+
+	void srcSearch();
+	void recvAudio();
+>>>>>>> historic
 public:
 	NDI(const outputParameter outputCfg);
 
@@ -167,6 +207,7 @@ void NDI::srcSearch()
 		{
 			if (url == i.p_url_address || selectAll)
 			{
+<<<<<<< HEAD
 				NDIlib_recv_create_v3_t recvConfig;
 				recvConfig.p_ndi_recv_name = i.p_ndi_name;
 				recvConfig.source_to_connect_to = i;
@@ -174,6 +215,9 @@ void NDI::srcSearch()
 				auto receiver = NDIlib_recv_create_v3(&recvConfig);
 				recvList.push_back(NDIReceiver(receiver));
 
+=======
+				recvList.push_back(NDIReceiver(i));
+>>>>>>> historic
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
 			}
@@ -191,8 +235,13 @@ void NDI::srcSearch()
 void NDI::recvAudio()
 {
 	while (true)
+<<<<<<< HEAD
 		for (auto [receiver, audioData] : std::views::zip(recvList, (*audio)))
 			receiver.getAudio<float>(audioData);
+=======
+		for(auto [recver,audio] : std::views::zip(recvList, (*audio)))
+			recver.getAudio(audio);
+>>>>>>> historic
 }
 #pragma endregion
 //IMPL NDI Recv
