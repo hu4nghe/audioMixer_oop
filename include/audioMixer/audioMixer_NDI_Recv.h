@@ -37,7 +37,7 @@ public:
 	}
    ~NDIFinder(){ NDIlib_find_destroy(finder); }
 
-    auto findSrc(std::uint32_tNDI_TIMEOUT) -> std::vector<NDIlib_source_t>
+    auto findSrc(std::uint32_t NDI_TIMEOUT) -> std::vector<NDIlib_source_t>
 	{
 		const NDIlib_source_t* sources		{ nullptr };
 				std::uint32_t  sourceNumber	{ 0 };
@@ -70,7 +70,7 @@ public:
 		if (receiver == nullptr)
 			throw std::runtime_error("Failed to create NDI receiver.");
 	}
-   ~NDIReceiver(){ NDIlib_recv_destroy(receiver); }
+   
 
 	template<audioType T>
 	void getAudio(audioQueue<T>& queue)
@@ -79,12 +79,12 @@ public:
 		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioFrame, nullptr, 0) == NDIlib_frame_type_audio)
 		{
 			const auto dataSize	   { audioFrame.no_samples * audioFrame.no_channels };
-				  auto audioBuffer { std::make_unique<T>(dataSize); }
+				  
 
 			if (std::is_same<T, float>::value)
 			{
 				NDIlib_audio_frame_interleaved_32f_t audio32f {};
-				audio32f.p_data = audioBuffer.get();
+				audio32f.p_data = new float[](dataSize);
 				NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audio32f);
 				std::vector<T> audioVec(audio32f.p_data, audio32f.p_data + dataSize);
 				if(queue.push(audioVec, audio32f.sample_rate, audio32f.no_channels))
@@ -93,7 +93,7 @@ public:
 			else
 			{
 				NDIlib_audio_frame_interleaved_16s_t audio16s {};
-				audio16s.p_data = audioBuffer.get();
+				audio16s.p_data = new short[](dataSize);
 				NDIlib_util_audio_to_interleaved_16s_v2(&audioFrame, &audio16s);
 				std::vector<T> audioVec(audio16s.p_data, audio16s.p_data + dataSize);
 				if (queue.push(audioVec, audio16s.sample_rate, audio16s.no_channels))
@@ -188,9 +188,6 @@ void NDI::recvAudio()
 			receiver.getAudio(audioData);
 }
 #pragma endregion
-<<<<<<< HEAD
 //IMPL NDI Recv
-=======
-//IMPL class NDI
->>>>>>> 3f14c9fbeadcd73e5ec02fda6d4c5845a7e1a40e
+
 #endif//NDI_RECV_MODULE_H
