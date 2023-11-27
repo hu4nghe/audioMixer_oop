@@ -56,8 +56,8 @@ public:
 class deltaCast : public audioMixerModule_base
 {
     //handles
-    std::unique_ptr< boardHandle>   boardHdl;
-    std::unique_ptr<streamHandle>   streamHdl;
+    std::unique_ptr< boardHandle> boardHdl;
+    std::unique_ptr<streamHandle> streamHdl;
     //HDMI audio infos
     VHD_DV_AUDIO_INFOFRAME HDMIAudioInfoFrame{};
     VHD_DV_AUDIO_AES_STS   HDMIAudioAESSts   {};
@@ -256,23 +256,21 @@ inline         void deltaCast::startStream       ()
     BYTE*  pBuffer      {nullptr};
     BYTE*  pAudioBuffer {nullptr};
     ULONG  bufferSize   {0};
-    audioQueue<float> queue(outputConfig);
-    audio->push_back(queue);
+    audio->push_back(audioQueue<float>(outputConfig));
 
 
     /* Start stream */
     VHD_StartStream(streamHdl->getHandle());
     std::print("HDMI audio reception started\n");
     active = true;
-    bool set{ false };
     /* Reception loop */
     while (true)
     {
         /* Try to lock next slot */
-        auto Result = VHD_LockSlotHandle(streamHdl->getHandle(), &slotHandle);
+        auto Result { VHD_LockSlotHandle(streamHdl->getHandle(), &slotHandle) };
         if (Result == VHDERR_NOERROR)
         {
-            VHD_DV_AUDIO_TYPE HDMIAudioType{};
+            VHD_DV_AUDIO_TYPE HDMIAudioType {};
 
             VHD_GetSlotBuffer     (slotHandle, VHD_DV_BT_VIDEO, &pBuffer, &bufferSize);
             VHD_GetSlotDvAudioInfo(slotHandle, &HDMIAudioType, &HDMIAudioInfoFrame, &HDMIAudioAESSts);
@@ -290,11 +288,7 @@ inline         void deltaCast::startStream       ()
                     src_short_to_float_array(temp.data(), floatData.data(), temp.size());
 
                     (*audio)[0].push(floatData, getSampleRate(), getChannelNumbers());
-                }
-                if (pAudioBuffer)
-                {
                     delete[] pAudioBuffer;
-                    pAudioBuffer = nullptr;
                 }
             }
             /* Unlock slot */
@@ -305,7 +299,7 @@ inline         void deltaCast::startStream       ()
     }
 }
 inline         auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,
-                                          const std:: size_t  sourceSize) -> std::vector<short>
+                                                  const std:: size_t  sourceSize) -> std::vector<short>
 {
     const auto newSize = sourceSize / 2;
     std::vector<short> shortArr(newSize);

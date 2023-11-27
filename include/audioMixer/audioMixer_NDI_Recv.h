@@ -4,13 +4,16 @@
 #include "Processing.NDI.Lib.h"
 
 #include <iostream>
+#include <ranges>
+
 
 #include "audioMixer_base.h"
 
+constexpr auto NDI_TIMEOUT { 1000 };
 
 class NDIFinder
 {
-	NDIlib_find_instance_t finder;
+	NDIlib_find_instance_t finder {};
 public:
 	NDIFinder()
 	{
@@ -26,81 +29,110 @@ public:
 		//configure finder
 		findCfg.show_local_sources = showLocalSources;
 		findCfg.p_groups		   = pGroups;
-		findCfg.p_extra_ips		   = nullptr;//deprecated feature
+		findCfg.p_extra_ips		   = nullptr; //deprecated feature
 
 		finder = NDIlib_find_create_v2(&findCfg);
 		if (!finder)//nullptr in case of failure.
 			throw std::runtime_error("Failed to create NDI finder !");
 	}
-   ~NDIFinder() 
-	{ 
-		NDIlib_find_destroy(finder); 
-	}
+   ~NDIFinder(){ NDIlib_find_destroy(finder); }
 
-    auto findSrc(std::uint32_t timeout) -> std::vector<NDIlib_source_t>
+    auto findSrc(std::uint32_tNDI_TIMEOUT) -> std::vector<NDIlib_source_t>
 	{
-		const NDIlib_source_t* source		= nullptr;
-				std::uint32_t  sourceNumber	= 0;
+		const NDIlib_source_t* sources		{ nullptr };
+				std::uint32_t  sourceNumber	{ 0 };
+						 bool  found		{ false };
 
-
-		bool found = false;
-
-		//try to find sources using this->finder.
+		//try to find sources
 		while (!found)
 		{
-			NDIlib_find_wait_for_sources(finder, timeout);
-			source = NDIlib_find_get_current_sources(finder, &sourceNumber);
-			found  = true;
+			NDIlib_find_wait_for_sources(finder,NDI_TIMEOUT);
+			sources = NDIlib_find_get_current_sources(finder, &sourceNumber);
+			found   = true;
 		}
 
-		std::vector<NDIlib_source_t> sourcesFound(sourceNumber);
-
-		//push sources into result vector
-		for (std::uint32_t i = 0; i < sourceNumber; i++)
-			sourcesFound[i] = source[i];
-
+		std::vector<NDIlib_source_t> sourcesFound(sources,sources+sourceNumber);
 		return sourcesFound;
+	}
+};
+
+class NDIReceiver
+{
+	NDIlib_recv_instance_t	receiver   {};
+public:
+	NDIReceiver() = default;
+	NDIReceiver(const NDIlib_source_t& source)
+	{
+		NDIlib_recv_create_v3_t recvConfig {};
+		recvConfig.p_ndi_recv_name = source.p_ndi_name;
+		recvConfig.source_to_connect_to = source;
+		receiver = NDIlib_recv_create_v3(&recvConfig);
+		if (receiver == nullptr)
+			throw std::runtime_error("Failed to create NDI receiver.");
+	}
+   ~NDIReceiver(){ NDIlib_recv_destroy(receiver); }
+
+	template<audioType T>
+	void getAudio(audioQueue<T>& queue)
+	{
+		NDIlib_audio_frame_v2_t audioFrame {};
+		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioFrame, nullptr, 0) == NDIlib_frame_type_audio)
+		{
+			const auto dataSize	   { audioFrame.no_samples * audioFrame.no_channels };
+				  auto audioBuffer { std::make_unique<T>(dataSize); }
+
+			if (std::is_same<T, float>::value)
+			{
+				NDIlib_audio_frame_interleaved_32f_t audio32f {};
+				audio32f.p_data = audioBuffer.get();
+				NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audio32f);
+				std::vector<T> audioVec(audio32f.p_data, audio32f.p_data + dataSize);
+				if(queue.push(audioVec, audio32f.sample_rate, audio32f.no_channels))
+					std::print("Push failed : no enough space in the queue !\n");
+			}
+			else
+			{
+				NDIlib_audio_frame_interleaved_16s_t audio16s {};
+				audio16s.p_data = audioBuffer.get();
+				NDIlib_util_audio_to_interleaved_16s_v2(&audioFrame, &audio16s);
+				std::vector<T> audioVec(audio16s.p_data, audio16s.p_data + dataSize);
+				if (queue.push(audioVec, audio16s.sample_rate, audio16s.no_channels))
+					std::print("Push failed : no enough space in the queue !\n");
+			}
+		}
+		else
+			std::print("No audio data is received.\n");
 	}
 };
 
 class NDI : public module
 {
 	/*NDI Receivers*/
-	std::vector<NDIlib_recv_instance_t>	recvList;
-
-	void srcSearch();
-	void recvAudio();
+	std::vector<NDIReceiver> recvList;
 public:
 	NDI(const outputParameter outputCfg);
 
     void start() override;
     void stop () override;
+
+	void srcSearch();
+	void recvAudio();
 };
 
 #pragma region IMPL
 	 NDI::NDI	   (const outputParameter outputCfg)
-	:	recvList (0),
-		module(outputCfg) {}
+	:	module(outputCfg) {}
 void NDI::start	   ()
 {
-	if (!NDIlib_initialize()) 
-		throw std::runtime_error("Cannot run NDI.");
-	else
-	{
-		std::print("NDI Module is activated.\n");
-		active = true;
-	}
+	NDIlib_initialize();
+	std::print("NDI Module is activated.\n");
+	active = true;
 	this->srcSearch(); 
-	this->recvAudio   ();
-
+	this->recvAudio();
 }
 void NDI::stop	   ()
 {
-	for (auto& i : recvList)
-		NDIlib_recv_destroy(i);
-
 	NDIlib_destroy();
-
 	std::print("NDI Module is stopped.\n");
 	active = false;
 }
@@ -109,9 +141,8 @@ void NDI::srcSearch()
 	if (!active)
 		throw std::logic_error("NDI lib is not running !");
 
-	constexpr auto timeout = 1000;
-	NDIFinder audioFinder;
-	auto sourcesFound = audioFinder.findSrc(timeout);
+			  NDIFinder audioFinder  {};
+			       auto sourcesFound { audioFinder.findSrc(NDI_TIMEOUT) };
 
 	//print all sources found
 	std::print("NDI sources list:\n");
@@ -119,10 +150,11 @@ void NDI::srcSearch()
 		std::print("Name : {}\nIP   : {}\n\n", i.p_ndi_name, i.p_url_address);
 
 	//let user select NDI sources that they want.
-	bool sourceMatched = false;
-	bool selectAll = false;
-	std::string url;
 
+	std::string url			  {};
+		   bool sourceMatched { false };
+		   bool selectAll	  { false };
+	
 	std::print("Please enter the IP of the source that you want to connect to, enter end to confirm.\n");
 	do
 	{
@@ -134,13 +166,7 @@ void NDI::srcSearch()
 		{
 			if (url == i.p_url_address || selectAll)
 			{
-				NDIlib_recv_create_v3_t recvConfig;
-				recvConfig.p_ndi_recv_name = i.p_ndi_name;
-				recvConfig.source_to_connect_to = i;
-
-				auto recv = NDIlib_recv_create_v3(&recvConfig);
-				recvList.push_back(recv);
-
+				recvList.push_back(NDIReceiver(i));
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
 			}
@@ -158,27 +184,13 @@ void NDI::srcSearch()
 void NDI::recvAudio()
 {
 	while (true)
-	{
-		for (std::size_t i = 0; i < recvList.size(); i++)
-		{
-			NDIlib_audio_frame_v2_t audioInput;
-			//receive only audio
-			if (NDIlib_recv_capture_v2(recvList[i], nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
-			{
-				// Receive audio data
-				const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
-				NDIlib_audio_frame_interleaved_32f_t audio32f;
-				audio32f.p_data = new float[dataSize];
-				NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio32f);
-				std::vector<float> audioData(audio32f.p_data, audio32f.p_data + dataSize);
-				if (!(*audio)[i].push(audioData, audio32f.sample_rate, audio32f.no_channels))
-					std::print("No more space in the queue!\n");
-
-				delete[] audio32f.p_data;
-			}
-		}
-	}
+		for (auto [receiver, audioData] : std::views::zip(recvList, (*audio)))
+			receiver.getAudio(audioData);
 }
 #pragma endregion
+<<<<<<< HEAD
 //IMPL NDI Recv
+=======
+//IMPL class NDI
+>>>>>>> 3f14c9fbeadcd73e5ec02fda6d4c5845a7e1a40e
 #endif//NDI_RECV_MODULE_H
