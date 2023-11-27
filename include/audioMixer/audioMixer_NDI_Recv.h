@@ -69,7 +69,6 @@ class recv
 	NDIlib_recv_instance_t receiver;
 public:
 	recv(NDIlib_recv_instance_t rec) : receiver(rec) {}
-	NDIlib_recv_instance_t getRecv() { return receiver; }
 	void getAudio(audioQueue<float>& audio)
 	{
 		NDIlib_audio_frame_v2_t audioInput;
@@ -122,9 +121,6 @@ void NDI::start	   ()
 }
 void NDI::stop	   ()
 {
-	for (auto& i : recvList)
-		NDIlib_recv_destroy(i.getRecv());
-
 	NDIlib_destroy();
 
 	std::print("NDI Module is stopped.\n");
