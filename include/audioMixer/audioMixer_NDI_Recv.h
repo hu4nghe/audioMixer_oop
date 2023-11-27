@@ -64,11 +64,18 @@ public:
 	}
 };
 
-class recv
+class NDIReceiver
 {
 	NDIlib_recv_instance_t receiver;
 public:
-	recv(NDIlib_recv_instance_t rec) : receiver(rec) {}
+	NDIReceiver(const NDIlib_source_t& src)
+	{
+		NDIlib_recv_create_v3_t recvConfig;
+		recvConfig.p_ndi_recv_name = src.p_ndi_name;
+		recvConfig.source_to_connect_to = src;
+		receiver = NDIlib_recv_create_v3(&recvConfig);
+	}
+
 	void getAudio(audioQueue<float>& audio)
 	{
 		NDIlib_audio_frame_v2_t audioInput;
@@ -92,7 +99,7 @@ public:
 class NDI : public module
 {
 	/*NDI Receivers*/
-	std::vector<recv> recvList;
+	std::vector<NDIReceiver> recvList;
 
 	void srcSearch();
 	void recvAudio();
@@ -156,13 +163,7 @@ void NDI::srcSearch()
 		{
 			if (url == i.p_url_address || selectAll)
 			{
-				NDIlib_recv_create_v3_t recvConfig;
-				recvConfig.p_ndi_recv_name = i.p_ndi_name;
-				recvConfig.source_to_connect_to = i;
-
-				auto recver = NDIlib_recv_create_v3(&recvConfig);
-				recvList.push_back(recv(recver));
-
+				recvList.push_back(NDIReceiver(i));
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
 			}
