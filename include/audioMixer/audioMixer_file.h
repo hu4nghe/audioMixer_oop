@@ -8,7 +8,6 @@
 
 #include "audioMixer_base.h"
 
-
 namespace fs = std::filesystem;
 
 class soundFile : public module
