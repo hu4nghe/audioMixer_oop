@@ -76,7 +76,8 @@ public:
 		//receive only audio
 		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
 		{
-			// Receive audio data
+			std::print("received.\n");
+			/*
 			const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
 			NDIlib_audio_frame_interleaved_32f_t audio32f;
 			audio32f.p_data = new float[dataSize];
@@ -85,7 +86,7 @@ public:
 			if (!audio.push(audioData, audio32f.sample_rate, audio32f.no_channels))
 				std::print("No more space in the queue!\n");
 
-			delete[] audio32f.p_data;
+			delete[] audio32f.p_data;*/
 		}
 	}
 };
@@ -183,12 +184,8 @@ void NDI::srcSearch()
 void NDI::recvAudio()
 {
 	while (true)
-	{
 		for(auto [recver,audio] : std::views::zip(recvList, (*audio)))
-		{
 			recver.getAudio(audio);
-		}
-	}
 }
 #pragma endregion
 
