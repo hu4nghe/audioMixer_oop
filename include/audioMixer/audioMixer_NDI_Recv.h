@@ -173,6 +173,7 @@ void NDI::srcSearch()
 
 				auto receiver = NDIlib_recv_create_v3(&recvConfig);
 				recvList.push_back(NDIReceiver(receiver));
+
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
 			}
