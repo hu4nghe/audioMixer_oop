@@ -41,7 +41,7 @@ public:
 	void startStream();
 };
 
-#pragma region IMPL audioMixer
+#pragma region IMPL
 template<inputMod_t U>
 inline void audioMixer::inputModuleInit	  ()																
 {
@@ -49,7 +49,7 @@ inline void audioMixer::inputModuleInit	  ()
 	if (!inputModules.contains(typeName))
 	{
 		inputModules.insert(std::make_pair <std::string, std::unique_ptr <U>>
-			(typeName, std::make_unique<U>(outputConfig)));
+										   (typeName   , std::make_unique<U>(outputConfig)));
 		std::print("{} module is enabled.\n", typeName);
 	}
 	else
@@ -59,8 +59,8 @@ inline void audioMixer::inputModuleInit	  ()
 	: outputConfig(outputCfg)
 {
 	/*Module select*/
-	char ch{};
-	bool moduleSelected{ false };
+	char ch		 {};
+	bool selected{ false };
 	std::print("Module selection :\n");
 	std::print("N(DI)	S(ndfile)	D(elta Cast)	A(ll)	E(nd)\n");
 	do
@@ -71,7 +71,7 @@ inline void audioMixer::inputModuleInit	  ()
 			inputModuleInit<NDI		 >();
 			inputModuleInit<soundFile>();
 			inputModuleInit<deltaCast>();
-			moduleSelected = true;
+			selected = true;
 		}
 		else if (ch == 'N' || ch == 'n')
 			inputModuleInit<NDI		 >();
@@ -80,10 +80,10 @@ inline void audioMixer::inputModuleInit	  ()
 		else if (ch == 'D' || ch == 'd')
 			inputModuleInit<deltaCast>();
 		else if (ch == 'E' || ch == 'e')
-			moduleSelected = true;
+			selected = true;
 		else
 			std::print("invalide choice!\n");
-	} while (!moduleSelected);
+	} while (!selected);
 	system("cls");
 
 	/*portaudio init function*/
@@ -104,7 +104,7 @@ inline void audioMixer::startStream		  ()
 	for (auto& [key, instance] : inputModules)
 		threads.emplace_back([&instance]() { instance->start(); });
 }
-		int audioMixer::PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData)
+inline	int audioMixer::PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData)
 {
 	return static_cast<audioMixer*>(userData)->PaOutCallback(inputBuffer,
 		outputBuffer,
@@ -112,7 +112,7 @@ inline void audioMixer::startStream		  ()
 		timeInfo,
 		statusFlags);
 }
-		int audioMixer::PaOutCallback	  (PA_CALLBACK_PARAM_LIST)
+inline  int audioMixer::PaOutCallback	  (PA_CALLBACK_PARAM_LIST)
 {
 	//output buffer init
 	auto out = static_cast<float*>(outputBuffer);
@@ -145,5 +145,4 @@ inline void audioMixer::PaStop			  ()
 }
 #pragma endregion
 //IMPL audioMixer
-
 #endif//AUDIOMIXER_IMPL_H
