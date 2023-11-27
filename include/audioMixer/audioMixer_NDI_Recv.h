@@ -4,6 +4,7 @@
 #include "Processing.NDI.Lib.h"
 
 #include <iostream>
+#include <ranges>
 
 #include "audioMixer_base.h"
 
@@ -183,10 +184,9 @@ void NDI::recvAudio()
 {
 	while (true)
 	{
-		for(auto [recver,audio] : std::ranges::view(recvList,(*audio)))
-		for (std::size_t i = 0; i < recvList.size(); i++)
+		for(auto [recver,audio] : std::views::zip(recvList, (*audio)))
 		{
-			recvList[i].getAudio((*audio)[i]);
+			recver.getAudio(audio);
 		}
 	}
 }
