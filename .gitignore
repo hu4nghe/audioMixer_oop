@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /lib/audioMixer/audio_mixer.idb
 /lib/audioMixer/audio_mixer.lib
+/include/audioMixer/difference.patch
