@@ -190,7 +190,7 @@ void NDI::recvAudio()
 {
 	while (true)
 		for (auto [receiver, audioData] : std::views::zip(recvList, (*audio)))
-			receiver.getAudio(audioData);
+			receiver.getAudio<float>(audioData);
 }
 #pragma endregion
 //IMPL NDI Recv
