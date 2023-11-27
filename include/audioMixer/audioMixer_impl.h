@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <typeinfo>
 #include <thread>
+#include <cctype>
 
 #include "audioMixer_NDI_Recv.h"
 #include "audioMixer_file.h"
@@ -50,6 +51,7 @@ inline void audioMixer::inputModuleInit	  ()
 	{
 		inputModules.insert(std::make_pair <std::string, std::unique_ptr <U>>
 										   (typeName   , std::make_unique<U>(outputConfig)));
+
 		std::print("{} module is enabled.\n", typeName);
 	}
 	else
@@ -66,36 +68,42 @@ inline void audioMixer::inputModuleInit	  ()
 	do
 	{
 		std::cin >> ch;
-		if (ch == 'A' || ch == 'a')
+		switch(std::toupper(ch))
 		{
-			inputModuleInit<NDI		 >();
-			inputModuleInit<soundFile>();
-			inputModuleInit<deltaCast>();
-			selected = true;
+			case 'A':
+				inputModuleInit<   NDI	 >();
+				inputModuleInit<soundFile>();
+				inputModuleInit<deltaCast>();
+				selected = true;
+				break;
+			case 'N':
+				inputModuleInit<   NDI	 >();
+				break;
+			case 'S':
+				inputModuleInit<soundFile>();
+				break;
+			case 'D':
+				inputModuleInit<deltaCast>();
+				break;
+			case 'E':
+				selected = true;
+				break;
+			default :
+				std::print("invalide choice!\n");
 		}
-		else if (ch == 'N' || ch == 'n')
-			inputModuleInit<NDI		 >();
-		else if (ch == 'S' || ch == 's')
-			inputModuleInit<soundFile>();
-		else if (ch == 'D' || ch == 'd')
-			inputModuleInit<deltaCast>();
-		else if (ch == 'E' || ch == 'e')
-			selected = true;
-		else
-			std::print("invalide choice!\n");
 	} while (!selected);
 	system("cls");
 
 	/*portaudio init function*/
 	PaErrorCheck(Pa_Initialize());
 	PaErrorCheck(Pa_OpenDefaultStream(&PaStreamOut,
-		0,							//output only
-		outputConfig.channelNumber,
-		paFloat32,					//32 bit float [-1;1]
-		outputConfig.sampleRate,
-		64,							//frames per buffer
-		&audioMixer::PaCallbackTransfer,
-		this));
+									   0,							//output only
+									   outputConfig.channelNumber,
+									   paFloat32,					//32 bit float [-1;1]
+									   outputConfig.sampleRate,
+									   64,							//frames per buffer
+									  &audioMixer::PaCallbackTransfer,
+								       this));
 }
 inline void audioMixer::startStream		  ()								
 {
@@ -128,15 +136,12 @@ inline  int audioMixer::PaOutCallback	  (PA_CALLBACK_PARAM_LIST)
 inline void audioMixer::PaErrorCheck	  (const PaError& err)
 {
 	if (err)
-	{
-		std::print("PortAudio error : {}.\n",
-				    Pa_GetErrorText(err));
-		exit(EXIT_FAILURE);
-	}
+		throw std::runtime_error(Pa_GetErrorText(err));
 }
 inline void audioMixer::PaStart			  ()
 {
-	Pa_StartStream(PaStreamOut);
+	if (Pa_IsStreamStopped(PaStreamOut))
+		PaErrorCheck(Pa_StartStream(PaStreamOut));
 }
 inline void audioMixer::PaStop			  ()
 {

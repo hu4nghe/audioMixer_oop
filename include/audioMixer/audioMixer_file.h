@@ -64,7 +64,6 @@ void soundFile::selectFile()
 			else
 			{
 				std::print("Error : No such file or dictory.\n");
-				continue;
 			}
 		}
 	} while (true);

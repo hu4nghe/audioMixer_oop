@@ -14,7 +14,7 @@ protected:
     std::shared_ptr<std::vector<audioQueue<float>>> audio;
     //Config, status
     outputParameter outputConfig;
-    bool            active;
+               bool active;
 public:
     audioMixerModule_base() 
         :   active(false) {};
@@ -33,7 +33,7 @@ public:
     virtual void start() = 0;
     virtual void stop () = 0;
 
-    [[nodiscard]] auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio; }
+    [[nodiscard]] auto getAudio() const -> std::shared_ptr<std::vector<audioQueue<float>>> { return audio ; }
     [[nodiscard]] bool isActive() const                                                    { return active; }
 };
 using module = audioMixerModule_base;
