@@ -170,6 +170,7 @@ void NDI::srcSearch()
 				NDIlib_recv_create_v3_t recvConfig;
 				recvConfig.p_ndi_recv_name = i.p_ndi_name;
 				recvConfig.source_to_connect_to = i;
+
 				auto receiver = NDIlib_recv_create_v3(&recvConfig);
 				recvList.push_back(receiver);
 				std::print("{} selected.\n", i.p_ndi_name);
