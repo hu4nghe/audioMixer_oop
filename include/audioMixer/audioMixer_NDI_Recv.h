@@ -63,10 +63,35 @@ public:
 	}
 };
 
+class recv
+{
+	NDIlib_recv_instance_t receiver;
+public:
+	recv(NDIlib_recv_instance_t rec) : receiver(rec) {}
+	NDIlib_recv_instance_t getRecv() { return receiver; }
+	void getAudio(audioQueue<float>& audio)
+	{
+		NDIlib_audio_frame_v2_t audioInput;
+		//receive only audio
+		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
+		{
+			// Receive audio data
+			const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
+			NDIlib_audio_frame_interleaved_32f_t audio32f;
+			audio32f.p_data = new float[dataSize];
+			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio32f);
+			std::vector<float> audioData(audio32f.p_data, audio32f.p_data + dataSize);
+			if (!audio.push(audioData, audio32f.sample_rate, audio32f.no_channels))
+				std::print("No more space in the queue!\n");
+
+			delete[] audio32f.p_data;
+		}
+	}
+};
 class NDI : public module
 {
 	/*NDI Receivers*/
-	std::vector<NDIlib_recv_instance_t>	recvList;
+	std::vector<recv> recvList;
 
 	void srcSearch();
 	void recvAudio();
@@ -79,8 +104,7 @@ public:
 
 #pragma region IMPL
 	 NDI::NDI	   (const outputParameter outputCfg)
-	:	recvList (0),
-		module(outputCfg) {}
+	:	module(outputCfg) {}
 void NDI::start	   ()
 {
 	if (!NDIlib_initialize()) 
@@ -97,7 +121,7 @@ void NDI::start	   ()
 void NDI::stop	   ()
 {
 	for (auto& i : recvList)
-		NDIlib_recv_destroy(i);
+		NDIlib_recv_destroy(i.getRecv());
 
 	NDIlib_destroy();
 
@@ -138,8 +162,8 @@ void NDI::srcSearch()
 				recvConfig.p_ndi_recv_name = i.p_ndi_name;
 				recvConfig.source_to_connect_to = i;
 
-				auto recv = NDIlib_recv_create_v3(&recvConfig);
-				recvList.push_back(recv);
+				auto recver = NDIlib_recv_create_v3(&recvConfig);
+				recvList.push_back(recv(recver));
 
 				std::print("{} selected.\n", i.p_ndi_name);
 				sourceMatched = true;
@@ -159,23 +183,10 @@ void NDI::recvAudio()
 {
 	while (true)
 	{
+		for(auto [recver,audio] : std::ranges::view(recvList,(*audio)))
 		for (std::size_t i = 0; i < recvList.size(); i++)
 		{
-			NDIlib_audio_frame_v2_t audioInput;
-			//receive only audio
-			if (NDIlib_recv_capture_v2(recvList[i], nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
-			{
-				// Receive audio data
-				const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
-				NDIlib_audio_frame_interleaved_32f_t audio32f;
-				audio32f.p_data = new float[dataSize];
-				NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio32f);
-				std::vector<float> audioData(audio32f.p_data, audio32f.p_data + dataSize);
-				if (!(*audio)[i].push(audioData, audio32f.sample_rate, audio32f.no_channels))
-					std::print("No more space in the queue!\n");
-
-				delete[] audio32f.p_data;
-			}
+			recvList[i].getAudio((*audio)[i]);
 		}
 	}
 }
