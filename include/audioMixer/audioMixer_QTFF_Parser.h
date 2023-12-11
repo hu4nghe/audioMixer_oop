@@ -66,7 +66,7 @@ public:
 
     bool openFile(const std::string& filePath) 
     {
-        try 
+        try
         {
             fs::path qtffPath(filePath);
             if (!fs::exists(qtffPath))
