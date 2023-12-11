@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{690ac522-9376-4640-b57c-5ae5db95aaea}</ProjectGuid>
-    <RootNamespace>audiomixer</RootNamespace>
+    <ProjectGuid>{69cf2cb2-e8b3-496f-a383-08ed42d1382b}</ProjectGuid>
+    <RootNamespace>libaudiomiertestapp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -40,7 +40,7 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
@@ -59,23 +59,23 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="audioMixer.props" />
+    <Import Project="..\audio_mixer\audioMixer.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="audioMixer.props" />
+    <Import Project="..\audio_mixer\audioMixer.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="audioMixer.props" />
+    <Import Project="..\audio_mixer\audioMixer.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="audioMixer.props" />
+    <Import Project="..\audio_mixer\audioMixer.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)lib\audioMixer\</OutDir>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,15 +111,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)lib\portaudio_x64.lib;$(SolutionDir)lib\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\samplerate.lib;$(SolutionDir)lib\sndfile.lib;$(SolutionDir)lib\VideoMasterHD.lib;$(SolutionDir)lib\VideoMasterHD_Audio.lib;$(SolutionDir)lib\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\VideoMasterHD_VbiData.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)lib\audioMixer\audio_mixer.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <Lib>
-      <AdditionalDependencies>$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\portaudio\portaudio_x64.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Audio.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_VbiData.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -138,17 +136,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="include\audioMixer\audioMixer.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_base.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_DeltaCast.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_file.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_impl.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_Mov_Parser.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_NDI_Recv.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_queue.h" />
+    <ClCompile Include="libaudiomier_testapp.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\audioMixer.cpp" />
+    <ProjectReference Include="..\audio_mixer\audio_mixer.vcxproj">
+      <Project>{690ac522-9376-4640-b57c-5ae5db95aaea}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

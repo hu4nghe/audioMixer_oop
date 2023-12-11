@@ -36,7 +36,7 @@ class audioMixer
 	void PaStop		  ();
 	//input modules init function
 	template<inputMod_t U>
-	void inputModuleInit();
+	void inputModInit();
 public:
     audioMixer(const outputParameter& outputCfg);
 	void startStream();
@@ -44,7 +44,7 @@ public:
 
 #pragma region IMPL
 template<inputMod_t U>
-inline void audioMixer::inputModuleInit	  ()																
+inline void audioMixer::inputModInit	  ()																
 {
 	auto typeName(typeid(U).name());
 	if (!inputModules.contains(typeName))
@@ -57,7 +57,7 @@ inline void audioMixer::inputModuleInit	  ()
 	else
 		std::print("Module already exist, please try another option.\n");
 }
-			audioMixer::audioMixer		  (const outputParameter& outputCfg)
+audioMixer::audioMixer					  (const outputParameter& outputCfg)
 	: outputConfig(outputCfg)
 {
 	/*Module select*/
@@ -71,19 +71,19 @@ inline void audioMixer::inputModuleInit	  ()
 		switch(std::toupper(ch))
 		{
 			case 'A':
-				inputModuleInit<   NDI	 >();
-				inputModuleInit<soundFile>();
-				inputModuleInit<deltaCast>();
+				inputModInit<   NDI	  >();
+				inputModInit<soundFile>();
+				inputModInit<deltaCast>();
 				selected = true;
 				break;
 			case 'N':
-				inputModuleInit<   NDI	 >();
+				inputModInit<   NDI	  >();
 				break;
 			case 'S':
-				inputModuleInit<soundFile>();
+				inputModInit<soundFile>();
 				break;
 			case 'D':
-				inputModuleInit<deltaCast>();
+				inputModInit<deltaCast>();
 				break;
 			case 'E':
 				selected = true;
