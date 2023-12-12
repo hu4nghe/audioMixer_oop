@@ -36,7 +36,7 @@
     <ClInclude Include="include\audioMixer\audioMixer_DeltaCast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\audioMixer\audioMixer_Mov_Parser.h">
+    <ClInclude Include="include\audioMixer\audioMixer_QTFF_Parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -62,7 +62,7 @@ audioMixer::audioMixer					  (const outputParameter& outputCfg)
 {
 	/*Module select*/
 	char ch		 {};
-	bool selected{ false };
+	bool selected = false;
 	std::print("Module selection :\n");
 	std::print("N(DI)	S(ndfile)	D(elta Cast)	A(ll)	E(nd)\n");
 	do

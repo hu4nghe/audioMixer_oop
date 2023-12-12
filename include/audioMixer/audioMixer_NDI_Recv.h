@@ -7,7 +7,7 @@
 #include "audioMixer_base.h"
 #include "Processing.NDI.Lib.h"
 
-constexpr auto NDI_TIMEOUT{ 1000 };
+constexpr auto NDI_TIMEOUT = 1000;
 
 class NDIFinder
 {
@@ -36,9 +36,9 @@ public:
    ~NDIFinder(){ NDIlib_find_destroy(finder); }
     auto findSrc(std::uint32_t NDI_TIMEOUT) -> std::vector<NDIlib_source_t>
 	{
-		const NDIlib_source_t* sources		{ nullptr };
-				std::uint32_t  sourceNumber	{ 0 };
-						 bool  found		{ false };
+		const NDIlib_source_t* sources		 = nullptr;
+				std::uint32_t  sourceNumber	 = 0;
+						 bool  found		 = false;
 
 		//try to find sources
 		while (!found)
@@ -142,8 +142,8 @@ void NDI::srcSearch()
 					i.p_ndi_name, i.p_url_address);
 
 	//let user select NDI sources that they want.
-	bool sourceMatched { false };
-	bool selectAll	   { false };
+	bool sourceMatched  = false;
+	bool selectAll	    = false;
 	std::print("Please enter the IP of the source that you want to connect to.\nA(ll)	E(nd)\n");
 	do
 	{

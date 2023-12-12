@@ -13,109 +13,143 @@ namespace fs = std::filesystem;
 constexpr std::uint32_t ftypCode = 0x66747970;
 constexpr std::uint32_t moovCode = 0x6D6F6F76;
 constexpr std::uint32_t trakCode = 0x7472616B;
+constexpr std::uint32_t sounCode = 0x736F756E;
+
+std::string getStr(std::uint32_t code)
+{
+    std::bitset<32> bits(code);
+    std::string result;
+    for (int i = 24; i >= 0; i -= 8)
+        result += static_cast<char>((bits >> i).to_ulong() & 0xFF);
+    return result;
+}
+
+
 class atom
 {
 protected:
-	std::uint32_t size;
-	std::uint32_t type;
+	std::uint32_t   size;
+	std::uint32_t   type;
+    std::streampos  pos;
 public:
-	         atom() = default;
-    virtual ~atom() = default;
-
-    virtual void read(std::ifstream& file)
+    atom(std::ifstream& file)
     {
-        file.read(reinterpret_cast<char*>(&size), sizeof(std::uint32_t));
-        file.read(reinterpret_cast<char*>(&type), sizeof(std::uint32_t));
+        try
+        {
+            pos = file.tellg();
+            file.read(reinterpret_cast<char*>(&size), sizeof(std::uint32_t));
+            file.read(reinterpret_cast<char*>(&type), sizeof(std::uint32_t));
+            type = ((type & 0xFF) << 24) | (((type >> 8) & 0xFF) << 16) | (((type >> 16) & 0xFF) << 8) | ((type >> 24) & 0xFF);
+            size = ((size & 0xFF) << 24) | (((size >> 8) & 0xFF) << 16) | (((size >> 16) & 0xFF) << 8) | ((size >> 24) & 0xFF);
+            std::print("type : {}\nsize : {}\n", this->getTypeStr(), size);
+        }
+        catch (const std::exception& e)
+        {
+            std::print(stderr, "Error : {}.\n", e.what());
+            throw std::runtime_error("Failed to read file.");
+        }
+        
     }
-    std::uint32_t getType() const noexcept{ return type; }
-    std::uint32_t getSize() const noexcept{ return size; }
-	std::string getTypeStr() const noexcept
-	{
+   ~atom() = default;
+
+    void gotoEnd(std::ifstream& file) const // declared const, but do modify the position of file pointer.
+    {
+        file.seekg(pos);
+        int i = file.tellg();
+        std::print("current atom head : {}\n", i);
+        file.seekg(size, std::ios::cur); 
+        i = file.tellg();
+        std::print("current atom end  : {}\n", i);
+    }
+
+    
+
+    [[nodiscard]] std::uint32_t getType   () const noexcept{ return type; }
+    [[nodiscard]] std::uint32_t getSize   () const noexcept{ return size; }
+    [[nodiscard]] std::string   getTypeStr() const noexcept
+    {
         std::bitset<32> bits(type);
         std::string result;
         for (int i = 24; i >= 0; i -= 8)
             result += static_cast<char>((bits >> i).to_ulong() & 0xFF);
         return result;
 	}
-};
 
-class ftyp : public atom
-{
-                std::uint32_t  majorBrand;
-                std::uint32_t  minorVersion;
-    std::vector<std::uint32_t> compatibleBrands;
-public: 
-    ftyp() = default;
-    void read(std::ifstream& file) override
+    bool typeIs(std::string_view fourCC) const
     {
-        file.read(reinterpret_cast<char*>(&size), sizeof(size));
-        file.read(reinterpret_cast<char*>(&type), sizeof(type));
-        file.read(reinterpret_cast<char*>(&majorBrand), sizeof(majorBrand));
-        file.read(reinterpret_cast<char*>(&minorVersion), sizeof(minorVersion));
+        if (fourCC.size() != 4)
+            throw std::invalid_argument("Input FourCC must have exactly four characters.");
+        return fourCC == this->getTypeStr();
     }
 };
 
 class QTFF
 {
     std::ifstream fileStream;
-    bool isContainerAtom(std::uint32_t atomType) 
+
+    std::uint32_t readBigEndian()
     {
-        return (atomType == 0x6D6F6F76) || (atomType == 0x7472616B);
+        std::uint32_t target = 0;
+        fileStream.read(reinterpret_cast<char*>(&target), sizeof(target));
+        target = ((target & 0xFF) << 24) | (((target >> 8) & 0xFF) << 16) | (((target >> 16) & 0xFF) << 8) | ((target >> 24) & 0xFF);
+        return target;
     }
 public:
-
-    bool openFile(const std::string& filePath) 
+    QTFF(const std::string& filePath)
     {
         try
         {
             fs::path qtffPath(filePath);
             if (!fs::exists(qtffPath))
                 throw std::runtime_error("Invalid file path.");
-            
             fileStream.open(filePath, std::ios::binary);
-
             if (!fileStream.is_open())
                 throw std::runtime_error("Failed to open file.");
-
-            char fileType[4];
-            
-            uint32_t version ;
-
-            fileStream.read(fileType, 4);
-            fileStream.read(reinterpret_cast<char*>(&version), sizeof(version));
-
-            // Verify the file type and version
-            if (std::string(fileType) != "ftyp")
+            atom fileType(fileStream);
+            if (!fileType.typeIs("ftyp"))
+            {
+                std::print("type is : {}", fileType.getTypeStr());
                 throw std::runtime_error("Not a valid QTFF file.");
-            
-            return true;
+            }
+            fileType.gotoEnd(fileStream);
         }
-        catch (const std::exception& e) 
+        catch (const std::exception& e)
         {
-            std::print(stderr, "Error : {}.\n", e.what());
-            return false;
+            throw std::runtime_error(std::format("Failed to open QTFF file : {}.", e.what()));
         }
     }
-    void parseAtom()
+   ~QTFF() { fileStream.close(); }
+    [[nodiscard]] std::size_t getPos() { return fileStream.tellg(); }
+
+    atom searchAtom(std::string_view code)
     {
-        atom header;
-        header.read(fileStream);
-
-        if (isContainerAtom(header.getType())) 
+        while (fileStream.good())
         {
-            std::streampos startPosition = fileStream.tellg();
-            std::streampos endPosition   = startPosition + header.getSize() - sizeof(atom);
-
-            // Recursively parse the contents of the container atom
-            while (fileStream.tellg() < endPosition) 
-                parseAtom();
-            fileStream.seekg(endPosition, std::ios::beg);
+            atom header(fileStream);
+            if (!header.typeIs(code))
+                header.gotoEnd(fileStream);
+            else
+                return header;
         }
-        else 
+        throw std::runtime_error("Atom not found.");
+    }
+
+    void searchAudioInfo()
+    {
+        auto moovAtom = searchAtom("moov");
+        size_t pos = fileStream.tellg();
+        size_t moovEndPos = pos + moovAtom.getSize();
+        while (fileStream.tellg() < moovEndPos)
         {
-            // Handle other atom types as needed
-            // You can add specific parsing logic for known atom types
-            std::cout << "Parsing logic for non-container atom..." << std::endl;
+            auto trakAtom = searchAtom("trak");
+            auto mdiaAtom = searchAtom("mdia");
+            auto hdlrAtom = searchAtom("hdlr");
+
+            auto hdlrSubType = readBigEndian();
+            fileStream.seekg(8, std::ios::cur);
+            
+            if (getStr(hdlrSubType) == "soun")
+                std::print("sound track found.\n");
         }
     }
 };
