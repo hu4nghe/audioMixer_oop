@@ -50,10 +50,7 @@ public:
             posBegin = file->tellg();
             size = read32bit_bigEndian();
             type = read32bit_bigEndian();
-
             std::print("type : {}\nsize : {}\n", this->getTypeStr(), size);
-            std::print("current atom head : {}\n", posBegin);
-            std::print("current atom end  : {}\n", posBegin + size);
         }
         catch (const std::exception& e)
         {
@@ -97,34 +94,17 @@ public:
 
 class QTFF
 {
-    sPtrFile fileStream;
+    sPtrFile             fileStream;
+    //sPtrQueueList<float> audio;
 
     template<typename T>
     T readBigEndian()
     {
         T value {};
-           
-        std::size_t pos = fileStream->tellg();
-        std::print("Pos before read : {}\n",pos);
-
         fileStream->read(reinterpret_cast<char*>(&value), sizeof(T));
-
-        pos = fileStream->tellg();
-        std::print("Pos after read : {}\n", pos);
-
         for (size_t i = 0; i < sizeof(T) / 2; ++i) 
-        {
             std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
-        }
         return value;
-    }
-    std::uint16_t readTwoBytesAsBigEndian()
-    {
-
-        char buffer[2];
-        fileStream->read(buffer, 2);
-        std::uint16_t result = static_cast<std::uint16_t>((static_cast<uint8_t>(buffer[0]) << 8) | static_cast<uint8_t>(buffer[1]));
-        return result;
     }
 public:
     QTFF(const std::string& filePath)
@@ -145,6 +125,7 @@ public:
                 throw std::runtime_error("Not a valid QTFF file.");
             }
             fileType.skip();
+            //audio = std::make_shared<std::vector<audioQueue<float>>>(outputCfg);
         }
         catch (const std::exception& e)
         {
@@ -226,11 +207,8 @@ public:
                 fileStream->seekg(2, std::ios::cur);//seek target(3)
                 std::uint32_t sampleRate = readBigEndian<std::uint32_t>();
                 std::print("sampleRate : {}\n", sampleRate);
+                
             }
-            
-            
-            
-
             //mp4aAtom.skip();
             break;
         }
