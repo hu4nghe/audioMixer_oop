@@ -62,10 +62,14 @@ public:
         }
     }
    ~atom() = default;
-
-    void skip()
+    
+    void restart()
     {
         file->seekg(posBegin);
+    }
+    void skip()
+    {
+        restart();
         file->seekg(size, std::ios::cur);
     }
     bool typeIs (std::string_view fourCC) const { return fourCC == this->getTypeStr(); }
@@ -95,12 +99,32 @@ class QTFF
 {
     sPtrFile fileStream;
 
-    std::uint32_t readBigEndian()
+    template<typename T>
+    T readBigEndian()
     {
-        std::uint32_t rawData = 0;
-        fileStream->read(reinterpret_cast<char*>(&rawData), sizeof(rawData));
-        rawData = ((rawData & 0xFF) << 24) | (((rawData >> 8) & 0xFF) << 16) | (((rawData >> 16) & 0xFF) << 8) | ((rawData >> 24) & 0xFF);
-        return rawData;
+        T value {};
+           
+        std::size_t pos = fileStream->tellg();
+        std::print("Pos before read : {}\n",pos);
+
+        fileStream->read(reinterpret_cast<char*>(&value), sizeof(T));
+
+        pos = fileStream->tellg();
+        std::print("Pos after read : {}\n", pos);
+
+        for (size_t i = 0; i < sizeof(T) / 2; ++i) 
+        {
+            std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
+        }
+        return value;
+    }
+    std::uint16_t readTwoBytesAsBigEndian()
+    {
+
+        char buffer[2];
+        fileStream->read(buffer, 2);
+        std::uint16_t result = static_cast<std::uint16_t>((static_cast<uint8_t>(buffer[0]) << 8) | static_cast<uint8_t>(buffer[1]));
+        return result;
     }
 public:
     QTFF(const std::string& filePath)
@@ -128,7 +152,6 @@ public:
         }
     }
    ~QTFF() { fileStream->close(); }
-    [[nodiscard]] std::size_t getPos() { return fileStream->tellg(); }
 
     atom searchAtom     (std::string_view code)
     {
@@ -145,9 +168,9 @@ public:
     void searchAudioInfo()
     {
         auto moovAtom = searchAtom("moov");
-        size_t posBegin = fileStream->tellg();
-        size_t moovEndPos = posBegin + moovAtom.getSize();
-        while (fileStream->tellg() < moovEndPos)
+        std::vector<atom> tracks;
+        
+        while (fileStream->tellg() < moovAtom.getEnd())
         {
             auto vtrakAtom = searchAtom("trak");
             vtrakAtom.skip();
@@ -157,13 +180,56 @@ public:
             auto stblAtom = searchAtom("stbl");
             auto stsdAtom = searchAtom("stsd");
             
+            /*
+             * stsd atom structure
+             * data fields            size    pos   status          diff
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Number of entries      4       12    target(1)       4
+             * ...
+             */
             fileStream->seekg(4, std::ios::cur);
-            std::uint32_t nbentries = readBigEndian();
-            std::print("number of entries : {}\n", nbentries);
-            auto mp4aAtom = searchAtom("mp4a");
-            fileStream->seekg(40, std::ios::cur);
-            std::uint32_t channelNum = readBigEndian();
-            std::print("channelNum : {}\n",channelNum);
+            std::uint32_t nbentries = readBigEndian<std::uint32_t>();
+
+            for (auto i = 0; i < nbentries; i++)
+            {
+                auto mp4aAtom = searchAtom("mp4a");
+                /*
+                 * mp4a layout
+                 * data fields            size    pos   status          diff
+                 * ----------------------------------------------------------
+                 * Size                   4       0     read
+                 * Type                   4       4     read
+                 * -----------------------------> 8     current pos     
+                 * Reserved               6       8     ignore
+                 * Data Reference Index   2       14    ignore
+                 * Reserved               8       16    ignore       
+                 * Channel Count          2       24    target(1)       16
+                 * -----------------------------> 26    pos after(1) 
+                 * Sample Size            2       26    target(2)       0
+                 * -----------------------------> 28    pos after(1)    
+                 * Reserved               2       28    ignore
+                 * Sample Rate            4       30    target(3)       2 
+                 */
+                fileStream->seekg(16, std::ios::cur);//seek target(1)
+                std::uint16_t channelCount = readBigEndian<std::uint16_t>();
+                std::print("channelNum : {}\n", channelCount);
+
+                //target(2)
+                std::uint16_t sampleSize = readBigEndian<std::uint16_t>();
+                std::print("sampleSize : {}\n", sampleSize);
+
+                fileStream->seekg(2, std::ios::cur);//seek target(3)
+                std::uint32_t sampleRate = readBigEndian<std::uint32_t>();
+                std::print("sampleRate : {}\n", sampleRate);
+            }
+            
+            
+            
 
             //mp4aAtom.skip();
             break;
