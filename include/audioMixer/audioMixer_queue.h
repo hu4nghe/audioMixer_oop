@@ -39,9 +39,9 @@ struct outputParameter
  * @tparam T audio data type : 32bit float[-1;1], 16bit short[-32768;32767].
  */
 template<typename T>
-concept audioType = std::same_as<T, std::int16_t> || std::same_as<T, float>;
+concept audio_t = std::same_as<T, std::int16_t> || std::same_as<T, float>;
 
-template <audioType T>
+template <audio_t T>
 class audioQueue 
 {
 private :
@@ -93,7 +93,7 @@ public :
 /**
  * @brief Default constructor.
  */
-template<audioType T>
+template<audio_t T>
 audioQueue<T>::audioQueue()
     :   queue(0),
         head (0), 
@@ -109,7 +109,7 @@ audioQueue<T>::audioQueue()
  * @param sampleCapacity       Capacity of buffer, in sample numbers.
  * @param minimumElementNumber The queue will reject all pop requests if the number of elements is lower than this threshold.
  */
-template<audioType T>
+template<audio_t T>
 audioQueue<T>::audioQueue(outputParameter outputConfig)
     :   queue    (outputConfig.queueCapacity),
         outConfig(outputConfig),
@@ -120,7 +120,7 @@ audioQueue<T>::audioQueue(outputParameter outputConfig)
 /**
  * @brief Copy constructor
  */
-template<audioType T>
+template<audio_t T>
 audioQueue<T>::audioQueue(const  audioQueue<T>& other)
     :   queue    (other.queue),
         outConfig(other.outConfig),
@@ -131,7 +131,7 @@ audioQueue<T>::audioQueue(const  audioQueue<T>& other)
 /**
  * @brief Move constructor
  */
-template<audioType T>
+template<audio_t T>
 audioQueue<T>::audioQueue(audioQueue<T>&& other) noexcept
     :   queue    (std::move(other.queue)),
         outConfig(other.outConfig),
@@ -152,7 +152,7 @@ audioQueue<T>::audioQueue(audioQueue<T>&& other) noexcept
  * @return true  If operation successed.
  * @return false If operation failed.
  */
-template<audioType T>
+template<audio_t T>
 bool audioQueue<T>::enqueue(const T value)
 {
     auto currTail = tail.load(std::memory_order_relaxed);
@@ -176,7 +176,7 @@ bool audioQueue<T>::enqueue(const T value)
  * @return true  If operation successed.
  * @return false If operation failed.
  */
-template<audioType T>
+template<audio_t T>
 bool audioQueue<T>::dequeue(         T& value, 
                             const bool  mode)
 {
@@ -191,7 +191,7 @@ bool audioQueue<T>::dequeue(         T& value,
     return true;
 }
 
-template<audioType T>
+template<audio_t T>
 void audioQueue<T>::clear()
 {
     head .store(0);
@@ -206,7 +206,7 @@ void audioQueue<T>::clear()
  * @param inputSampleRate    Input samplerate.
  * @param inputChannelNumber Input Channel numbers. For sample number calculation
  */
-template<audioType T>
+template<audio_t T>
 void audioQueue<T>::resample(      std::vector<T>& data,
                              const std::uint32_t   inputSampleRate,
                              const std:: uint8_t   inputChannelNumber)
@@ -254,7 +254,7 @@ void audioQueue<T>::resample(      std::vector<T>& data,
  * @param  data                  Input audio vector.
  * @param  originqlChannelNumber Input Channel numbers.
  */
-template<audioType T>
+template<audio_t T>
 void audioQueue<T>::channelConvert(      std::vector<T>& data,
                                    const std:: uint8_t   originalChannelNumber)
 {
@@ -281,7 +281,7 @@ void audioQueue<T>::channelConvert(      std::vector<T>& data,
  * @return true               If operation sucessed
  * @return false              If operation failed due to no enough space.
  */
-template<audioType T>
+template<audio_t T>
 bool audioQueue<T>::push(      std::vector<T>&  data,
                          const std::uint32_t    inputSampleRate,
                          const std:: uint8_t    inputChannelNumber)
@@ -307,7 +307,7 @@ bool audioQueue<T>::push(      std::vector<T>&  data,
  * @return true     If operation successed.
  * @return false    If operation failed / partially failed due to no enough samples in buffer.
  */
-template<audioType T>
+template<audio_t T>
 bool audioQueue<T>::pop(                T*& data, 
                         const std::size_t   frames,
                         const        bool   mode)
@@ -330,7 +330,7 @@ bool audioQueue<T>::pop(                T*& data,
  * 
  * @param newCapacity New queue capacity wanted.
  */
-template<audioType T>
+template<audio_t T>
 void audioQueue<T>::setCapacity(const std::size_t newCapacity) 
 {   
     if (newCapacity == queue.size()) 

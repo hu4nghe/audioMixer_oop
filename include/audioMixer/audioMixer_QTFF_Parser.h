@@ -94,7 +94,7 @@ public:
 
 class QTFF
 {
-    sPtrFile             fileStream;
+    sPtrFile fileStream;
     //sPtrQueueList<float> audio;
 
     template<typename T>
@@ -150,6 +150,7 @@ public:
     {
         auto moovAtom = searchAtom("moov");
         std::vector<atom> tracks;
+        while (fileStream->tellg() < moovAtom.getEnd())
         
         while (fileStream->tellg() < moovAtom.getEnd())
         {
