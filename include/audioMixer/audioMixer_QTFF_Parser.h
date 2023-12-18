@@ -103,7 +103,7 @@ public:
     [[nodiscard]] std::uint32_t getType   () const noexcept{ return type; }
     [[nodiscard]] std::uint32_t getSize   () const noexcept{ return size; }
     [[nodiscard]] std::uint32_t getHead   () const noexcept{ return posBegin; }
-    [[nodiscard]] std::uint32_t getEnd    () const noexcept{ return posBegin + size; }
+    [[nodiscard]] std::uint32_t end    () const noexcept{ return posBegin + size; }
 };
 
 class QTFF
@@ -151,14 +151,34 @@ public:
     void searchAudioInfo()
     {
         auto moovAtom = searchAtom("moov");
-        std::vector<atom> tracks;
-        
-        while (fileStream->tellg() < moovAtom.getEnd())
+        //parse all tracks
+        std::vector<atom> soundTracksMdia;
+        while (fileStream->tellg() < moovAtom.end())
         {
-            auto vtrkAtom = searchAtom("trak");
-                 vtrkAtom.skip();
-            auto strkAtom = searchAtom("trak");
+            auto trakAtom = searchAtom("trak");
             auto mdiaAtom = searchAtom("mdia");
+            auto hdlrAtom = searchAtom("hdlr");
+            /*
+             * hdlr atom structure
+             * data fields            size    pos   status          diff
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Component type         4       12    ignore
+             * Conponent subtype      4       16    target
+             * ...
+             */
+            std::uint32_t trackType = 0;
+            fileStream->readBigEndian(trackType);
+            if (getStr(trackType) == "soun")
+                soundTracksMdia.push_back(mdiaAtom);
+            trakAtom.skip();
+        }
+        for (auto& mdia : soundTracksMdia)
+        {                                                           %?
             auto minfAtom = searchAtom("minf");
             auto stblAtom = searchAtom("stbl");
             auto stsdAtom = searchAtom("stsd");
