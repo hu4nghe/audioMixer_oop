@@ -15,7 +15,44 @@ constexpr std::uint32_t moovCode = 0x6D6F6F76;
 constexpr std::uint32_t trakCode = 0x7472616B;
 constexpr std::uint32_t sounCode = 0x736F756E;
 
-using sPtrFile = std::shared_ptr<std::ifstream>;
+class fileReader : public std::ifstream
+{
+public:
+    fileReader& readBigEndian(char* buffer, std::streamsize count) 
+    {
+        if (!this->good()) 
+            throw std::ios_base::failure("Error reading from file.");
+        try 
+        {
+            std::streamsize num = this->rdbuf()->sgetn(buffer, count);
+
+            for (std::streamsize i = 0; i < count / 2; ++i)
+                std::swap(buffer[i], buffer[count - 1 - i]);
+            if (num != count) 
+            {
+                this->setstate(std::ios_base::eofbit | std::ios_base::failbit);
+                throw std::ios_base::failure("Error reading from file.");
+            }
+        }
+        catch (...) 
+        {
+            this->setstate(std::ios_base::badbit | std::ios_base::failbit);
+            throw;  // Re-throw the caught exception
+        }
+
+        return *this;
+    }
+
+    template<typename T>
+    void readBigEndian(T& value)
+    {
+        this->read(reinterpret_cast<char*>(&value), sizeof(T));
+        for (size_t i = 0; i < sizeof(T) / 2; ++i)
+            std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
+    }
+};
+
+using sPtrFile = std::shared_ptr<fileReader>;
 
 static std::string getStr(std::uint32_t code)
 {
@@ -33,14 +70,6 @@ protected:
 	std::uint32_t  type;
     std::size_t    posBegin;
     sPtrFile       file;
-private:
-    std::uint32_t read32bit_bigEndian()
-    {
-        std::uint32_t rawData = 0;
-        file->read(reinterpret_cast<char*>(&rawData), sizeof(std::uint32_t));
-        rawData = ((rawData & 0xFF) << 24) | (((rawData >> 8) & 0xFF) << 16) | (((rawData >> 16) & 0xFF) << 8) | ((rawData >> 24) & 0xFF);
-        return rawData;
-    }
 public:
     atom(sPtrFile fileStream)
     {
@@ -48,9 +77,9 @@ public:
         try
         {
             posBegin = file->tellg();
-            size = read32bit_bigEndian();
-            type = read32bit_bigEndian();
-            std::print("type : {}\nsize : {}\n", this->getTypeStr(), size);
+            file->readBigEndian(size);
+            file->readBigEndian(type);
+            //std::print("type : {}\nsize : {}\n", this->getTypeStr(), size);
         }
         catch (const std::exception& e)
         {
@@ -69,67 +98,40 @@ public:
         restart();
         file->seekg(size, std::ios::cur);
     }
-    bool typeIs (std::string_view fourCC) const { return fourCC == this->getTypeStr(); }
+    bool typeIs (std::string_view fourCC) const { return fourCC == getStr(type); }
 
     [[nodiscard]] std::uint32_t getType   () const noexcept{ return type; }
     [[nodiscard]] std::uint32_t getSize   () const noexcept{ return size; }
     [[nodiscard]] std::uint32_t getHead   () const noexcept{ return posBegin; }
-    [[nodiscard]] std::uint32_t getEnd    () const noexcept{ return posBegin + size; }
-    [[nodiscard]] std::string   getTypeStr() const noexcept
-    {
-        std::bitset<32> bits(type);
-        std::string result;
-        for (int i = 24; i >= 0; i -= 8)
-            result += static_cast<char>((bits >> i).to_ulong() & 0xFF);
-        return result;
-	}
-};
-
-class mp4aAtom : public atom
-{
-
-public:
-    mp4aAtom(sPtrFile file) : atom(file) {}
+    [[nodiscard]] std::uint32_t end    () const noexcept{ return posBegin + size; }
 };
 
 class QTFF
 {
     sPtrFile fileStream;
     //sPtrQueueList<float> audio;
-
-    template<typename T>
-    T readBigEndian()
-    {
-        T value {};
-        fileStream->read(reinterpret_cast<char*>(&value), sizeof(T));
-        for (size_t i = 0; i < sizeof(T) / 2; ++i) 
-            std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
-        return value;
-    }
 public:
     QTFF(const std::string& filePath)
     {
         try
         {
-            fileStream = std::make_shared<std::ifstream>();
+            fileStream = std::make_shared<fileReader>();
             fs::path qtffPath(filePath);
             if (!fs::exists(qtffPath))
                 throw std::runtime_error("Invalid file path.");
             fileStream->open(filePath, std::ios::binary);
             if (!fileStream->is_open())
                 throw std::runtime_error("Failed to open file.");
+
             atom fileType(fileStream);
             if (!fileType.typeIs("ftyp"))
-            {
-                std::print("type is : {}", fileType.getTypeStr());
                 throw std::runtime_error("Not a valid QTFF file.");
-            }
             fileType.skip();
             //audio = std::make_shared<std::vector<audioQueue<float>>>(outputCfg);
         }
         catch (const std::exception& e)
         {
-            throw std::runtime_error(std::format("Failed to open QTFF file : {}.", e.what()));
+            throw std::runtime_error(std::format("Failed to parse file : {}.", e.what()));
         }
     }
    ~QTFF() { fileStream->close(); }
@@ -149,15 +151,34 @@ public:
     void searchAudioInfo()
     {
         auto moovAtom = searchAtom("moov");
-        std::vector<atom> tracks;
-        while (fileStream->tellg() < moovAtom.getEnd())
-        
-        while (fileStream->tellg() < moovAtom.getEnd())
+        //parse all tracks
+        std::vector<atom> soundTracksMdia;
+        while (fileStream->tellg() < moovAtom.end())
         {
-            auto vtrakAtom = searchAtom("trak");
-            vtrakAtom.skip();
-            auto strakAtom = searchAtom("trak");
+            auto trakAtom = searchAtom("trak");
             auto mdiaAtom = searchAtom("mdia");
+            auto hdlrAtom = searchAtom("hdlr");
+            /*
+             * hdlr atom structure
+             * data fields            size    pos   status          diff
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Component type         4       12    ignore
+             * Conponent subtype      4       16    target
+             * ...
+             */
+            std::uint32_t trackType = 0;
+            fileStream->readBigEndian(trackType);
+            if (getStr(trackType) == "soun")
+                soundTracksMdia.push_back(mdiaAtom);
+            trakAtom.skip();
+        }
+        for (auto& mdia : soundTracksMdia)
+        {                                                           %?
             auto minfAtom = searchAtom("minf");
             auto stblAtom = searchAtom("stbl");
             auto stsdAtom = searchAtom("stsd");
@@ -175,7 +196,8 @@ public:
              * ...
              */
             fileStream->seekg(4, std::ios::cur);
-            std::uint32_t nbentries = readBigEndian<std::uint32_t>();
+            std::uint32_t nbentries = 0;
+            fileStream->readBigEndian(nbentries);
 
             for (auto i = 0; i < nbentries; i++)
             {
@@ -197,16 +219,19 @@ public:
                  * Reserved               2       28    ignore
                  * Sample Rate            4       30    target(3)       2 
                  */
+                std::uint16_t channelCount = 0;
                 fileStream->seekg(16, std::ios::cur);//seek target(1)
-                std::uint16_t channelCount = readBigEndian<std::uint16_t>();
+                fileStream->readBigEndian(channelCount);
                 std::print("channelNum : {}\n", channelCount);
 
                 //target(2)
-                std::uint16_t sampleSize = readBigEndian<std::uint16_t>();
+                std::uint16_t sampleSize = 0;
+                fileStream->readBigEndian(sampleSize);
                 std::print("sampleSize : {}\n", sampleSize);
 
+                std::uint32_t sampleRate = 0;
                 fileStream->seekg(2, std::ios::cur);//seek target(3)
-                std::uint32_t sampleRate = readBigEndian<std::uint32_t>();
+                fileStream->readBigEndian(sampleRate);
                 std::print("sampleRate : {}\n", sampleRate);
                 
             }
