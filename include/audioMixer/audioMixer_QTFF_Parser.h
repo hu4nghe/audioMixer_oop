@@ -7,6 +7,7 @@
 #include <bitset>
 
 #include "audioMixer_base.h"
+#include <variant>
 
 namespace fs = std::filesystem;
 
@@ -48,7 +49,7 @@ public:
     {
         this->read(reinterpret_cast<char*>(&value), sizeof(T));
         for (size_t i = 0; i < sizeof(T) / 2; ++i)
-            std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
+        std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
     }
 };
 
@@ -66,20 +67,21 @@ static std::string getStr(std::uint32_t code)
 class atom
 {
 protected:
-	std::uint32_t  size;
-	std::uint32_t  type;
-    std::size_t    posBegin;
-    sPtrFile       file;
+	std::uint32_t  atomSize;
+	std::uint32_t  atomType;
+    std::  size_t  posBegin;
+         sPtrFile  file;
 public:
+    atom() = default;
     atom(sPtrFile fileStream)
     {
         file = fileStream;
         try
         {
             posBegin = file->tellg();
-            file->readBigEndian(size);
-            file->readBigEndian(type);
-            //std::print("type : {}\nsize : {}\n", this->getTypeStr(), size);
+            file->readBigEndian(atomSize);
+            file->readBigEndian(atomType);
+            std::print("atomType : {}\nsize : {}\n", getStr(atomType), atomSize);
         }
         catch (const std::exception& e)
         {
@@ -96,20 +98,21 @@ public:
     void skip()
     {
         restart();
-        file->seekg(size, std::ios::cur);
+        file->seekg(atomSize, std::ios::cur);
     }
-    bool typeIs (std::string_view fourCC) const { return fourCC == getStr(type); }
+    bool typeIs (std::string_view fourCC) const { return fourCC == getStr(atomType); }
 
-    [[nodiscard]] std::uint32_t getType   () const noexcept{ return type; }
-    [[nodiscard]] std::uint32_t getSize   () const noexcept{ return size; }
-    [[nodiscard]] std::uint32_t getHead   () const noexcept{ return posBegin; }
-    [[nodiscard]] std::uint32_t end    () const noexcept{ return posBegin + size; }
+    [[nodiscard]] std::uint32_t type   () const noexcept{ return atomType; }
+    [[nodiscard]] std::uint32_t size   () const noexcept{ return atomSize; }
+    [[nodiscard]] std::uint32_t head   () const noexcept{ return posBegin; }
+    [[nodiscard]] std::uint32_t end    () const noexcept{ return posBegin + atomSize; }
 };
 
 class QTFF
 {
     sPtrFile fileStream;
-    //sPtrQueueList<float> audio;
+    std::vector<atom> soundTracksMdia;
+    sPtrQueueList<float> audio;
 public:
     QTFF(const std::string& filePath)
     {
@@ -135,57 +138,53 @@ public:
         }
     }
    ~QTFF() { fileStream->close(); }
-
     atom searchAtom     (std::string_view code)
     {
-        while (fileStream->good())
+        fileStream->seekg(0, std::ios::end);
+        std::size_t eof = fileStream->tellg();
+        bool exit = false;
+        while(!exit)
         {
             atom header(fileStream);
             if (header.typeIs(code))
                 return header;
             else
                 header.skip();
+            if (header.end() == eof)
+                exit = true;
         }
-        throw std::runtime_error("Atom not found.");
+        return atom();
     }
     void searchAudioInfo()
     {
         auto moovAtom = searchAtom("moov");
+        bool exit = false;
         //parse all tracks
-        std::vector<atom> soundTracksMdia;
-        while (fileStream->tellg() < moovAtom.end())
+        while (!exit)
         {
-            auto trakAtom = searchAtom("trak");
-            auto mdiaAtom = searchAtom("mdia");
-            auto hdlrAtom = searchAtom("hdlr");
-            /*
-             * hdlr atom structure
-             * data fields            size    pos   status          diff
-             * ----------------------------------------------------------
-             * Size                   4       0     read
-             * Type                   4       4     read
-             * -----------------------------> 8     current pos
-             * Version                1       8     ignore
-             * Flags                  3       9     ignore
-             * Component type         4       12    ignore
-             * Conponent subtype      4       16    target
-             * ...
-             */
-            std::uint32_t trackType = 0;
-            fileStream->readBigEndian(trackType);
-            if (getStr(trackType) == "soun")
-                soundTracksMdia.push_back(mdiaAtom);
-            trakAtom.skip();
+            try
+            {
+                auto trakAtom = searchAtom("trak");
+                if (trakAtom.size() == 0)
+                    throw std::runtime_error("track no found.");
+                else
+                    findSoundTrack(trakAtom);
+            }
+            catch (const std::exception& e)
+            {
+                exit = true;
+            }
         }
         for (auto& mdia : soundTracksMdia)
-        {                                                           %?
+        {
+            fileStream->seekg(mdia.head(), std::ios::beg);
             auto minfAtom = searchAtom("minf");
             auto stblAtom = searchAtom("stbl");
             auto stsdAtom = searchAtom("stsd");
             
             /*
              * stsd atom structure
-             * data fields            size    pos   status          diff
+             * data fields            atomSize    pos   status          diff
              * ----------------------------------------------------------
              * Size                   4       0     read
              * Type                   4       4     read
@@ -204,7 +203,7 @@ public:
                 auto mp4aAtom = searchAtom("mp4a");
                 /*
                  * mp4a layout
-                 * data fields            size    pos   status          diff
+                 * data fields            atomSize    pos   status          diff
                  * ----------------------------------------------------------
                  * Size                   4       0     read
                  * Type                   4       4     read
@@ -215,7 +214,7 @@ public:
                  * Channel Count          2       24    target(1)       16
                  * -----------------------------> 26    pos after(1) 
                  * Sample Size            2       26    target(2)       0
-                 * -----------------------------> 28    pos after(1)    
+                 * -----------------------------> 28    pos after(2)    
                  * Reserved               2       28    ignore
                  * Sample Rate            4       30    target(3)       2 
                  */
@@ -238,6 +237,32 @@ public:
             //mp4aAtom.skip();
             break;
         }
+    }
+    void findSoundTrack(atom& track)
+    {
+        if (getStr(track.type()) != "trak")
+            throw std::invalid_argument("Not a trak atom.");
+        auto mdiaAtom = searchAtom("mdia");
+        auto hdlrAtom = searchAtom("hdlr");
+        /*
+         * hdlr atom structure
+         * data fields            atomSize    pos   status      diff
+         * ----------------------------------------------------------
+         * Size                   4       0     read
+         * Type                   4       4     read
+         * -----------------------------> 8     current pos
+         * Version                1       8     ignore
+         * Flags                  3       9     ignore
+         * Component atomType     4       12    ignore
+         * Conponent subtype      4       16    target          8             
+         * ...
+         */
+        std::uint32_t trackType = 0;
+        fileStream->seekg(8, std::ios::cur);
+        fileStream->readBigEndian(trackType);
+        if (getStr(trackType) == "soun")
+            soundTracksMdia.push_back(mdiaAtom);
+        track.skip();
     }
 };
 
