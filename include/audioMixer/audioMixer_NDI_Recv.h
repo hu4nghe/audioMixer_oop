@@ -66,7 +66,7 @@ public:
 		if(!receiver)
 			throw std::runtime_error("Failed to create NDI receiver !");
 	}
-	template <audioType T>
+	template <audio_t T>
 	void extractAudio(audioQueue<T>& audio)
 	{
 		NDIlib_audio_frame_v2_t audioInput {};

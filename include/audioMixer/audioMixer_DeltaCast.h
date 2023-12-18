@@ -67,19 +67,18 @@ class deltaCast : public audioMixerModule_base
 public:
 	deltaCast(const outputParameter& outputCfg);
 
-	void start() override;
-	void stop () override;
-
-            void streamConfig     ();
-            void startStream      ();
-    std:: size_t getSampleRate    () const;
-    std::uint8_t getChannelNumbers() const;
+	void start            () override;
+	void stop             () override;
+    void streamConfig     ();
+    void startStream      ();
+    auto getSampleRate    () const;
+    auto getChannelNumbers() const;
     
 };
 
 #pragma region IMPL
 
-                    deltaCast::deltaCast         (const outputParameter& outputCfg)
+            deltaCast::deltaCast         (const outputParameter& outputCfg)
 	:	module(outputCfg)
 {
     ULONG boardNumber {0};
@@ -96,7 +95,7 @@ public:
             throw std::runtime_error("No Delta board detected.");
     }
 }
-inline std:: size_t deltaCast::getSampleRate     () const
+inline auto deltaCast::getSampleRate     () const
 {
     const int code{ HDMIAudioInfoFrame.SamplingFrequency };
     std::size_t sampleRate{};
@@ -167,7 +166,7 @@ inline std:: size_t deltaCast::getSampleRate     () const
 
 
 }
-inline std::uint8_t deltaCast::getChannelNumbers () const
+inline auto deltaCast::getChannelNumbers () const
 {
     const std::uint32_t code{ HDMIAudioInfoFrame.ChannelCount };
     std::uint8_t channelNumber{};
@@ -206,17 +205,17 @@ inline std::uint8_t deltaCast::getChannelNumbers () const
     }
     return channelNumber;
 }
-inline         void deltaCast::start             ()
+inline void deltaCast::start             ()
 {
     this->streamConfig();
     this->startStream ();
 }
-inline         void deltaCast::stop              ()
+inline void deltaCast::stop              ()
 {
     VHD_StopStream(streamHdl->getHandle());
     active = false;
 }
-inline         void deltaCast::streamConfig      ()
+inline void deltaCast::streamConfig      ()
 {
     VHD_DV_MODE DvMode{NB_VHD_DV_MODES};
     do
@@ -249,7 +248,7 @@ inline         void deltaCast::streamConfig      ()
     else
         throw std::runtime_error("ERROR : Cannot detect if incoming mode is HDMI.");
 }
-inline         void deltaCast::startStream       ()
+inline void deltaCast::startStream       ()
 {
     
     HANDLE slotHandle   {nullptr};
@@ -298,8 +297,8 @@ inline         void deltaCast::startStream       ()
             throw std::runtime_error("ERROR : Cannot lock slot on RX0 stream.");
     }
 }
-inline         auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,
-                                                  const std:: size_t  sourceSize) -> std::vector<short>
+inline auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,
+                                          const std:: size_t  sourceSize) -> std::vector<short>
 {
     const auto newSize = sourceSize / 2;
     std::vector<short> shortArr(newSize);

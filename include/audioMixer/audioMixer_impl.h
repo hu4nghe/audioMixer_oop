@@ -21,12 +21,11 @@
 
 class audioMixer
 {
-	//Input modules
-	std::unordered_map<std::string,std::unique_ptr<module>> inputModules;
-	//Portaudio output configurations
-	outputParameter outputConfig;
-	//portaudio stream ptr
-	PaStream* PaStreamOut;
+	using modulePool = std::unordered_map<std::string, std::unique_ptr<module>>;
+	
+	     modulePool	 inputModules;
+	outputParameter  outputConfig;
+		   PaStream* paStreamOut;
 	//portaudio functions
 	static int PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData);
 
@@ -57,7 +56,7 @@ inline void audioMixer::inputModInit	  ()
 	else
 		std::print("Module already exist, please try another option.\n");
 }
-audioMixer::audioMixer					  (const outputParameter& outputCfg)
+			audioMixer::audioMixer		  (const outputParameter& outputCfg)
 	: outputConfig(outputCfg)
 {
 	/*Module select*/
@@ -96,7 +95,7 @@ audioMixer::audioMixer					  (const outputParameter& outputCfg)
 
 	/*portaudio init function*/
 	PaErrorCheck(Pa_Initialize());
-	PaErrorCheck(Pa_OpenDefaultStream(&PaStreamOut,
+	PaErrorCheck(Pa_OpenDefaultStream(&paStreamOut,
 									   0,							//output only
 									   outputConfig.channelNumber,
 									   paFloat32,					//32 bit float [-1;1]
@@ -140,13 +139,13 @@ inline void audioMixer::PaErrorCheck	  (const PaError& err)
 }
 inline void audioMixer::PaStart			  ()
 {
-	if (Pa_IsStreamStopped(PaStreamOut))
-		PaErrorCheck(Pa_StartStream(PaStreamOut));
+	if (Pa_IsStreamStopped(paStreamOut))
+		PaErrorCheck(Pa_StartStream(paStreamOut));
 }
 inline void audioMixer::PaStop			  ()
 {
-	if (Pa_IsStreamActive(PaStreamOut))
-		PaErrorCheck(Pa_StopStream(PaStreamOut));
+	if (Pa_IsStreamActive(paStreamOut))
+		PaErrorCheck(Pa_StopStream(paStreamOut));
 }
 #pragma endregion
 //IMPL audioMixer

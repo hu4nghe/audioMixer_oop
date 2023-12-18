@@ -2,29 +2,26 @@
 #define AUDIOMIXER_BASE_H
 
 #include <cstdint>
-#include <memory>sPtrQueueList
+#include <memory>
 #include <print>
 
 #include "audioMixer_queue.h"
 
-template <audioType T>
+template <audio_t T>
 using sPtrQueueList = std::shared_ptr<std::vector<audioQueue<T>>>;
 
 class audioMixerModule_base
 {
 protected:
-    //audioData
     sPtrQueueList<float> audio;
-    //Config, status
-    outputParameter outputConfig;
-               bool active;
+        outputParameter  outputConfig;
+                   bool  active;
 public:
     audioMixerModule_base() 
-        :   active(false) {};
+        :   active      (false){};
     audioMixerModule_base(const outputParameter& outputCfg) 
-        :   active(false), 
-            outputConfig(outputCfg)
-    { audio = std::make_shared<std::vector<audioQueue<float>>>(); }
+        :   active      (false), 
+            outputConfig(outputCfg){ audio = std::make_shared<std::vector<audioQueue<float>>>(); }
 
     //any copy or move of a audioMixer module is NOT possible!
     audioMixerModule_base           (const audioMixerModule_base&  other) = delete;
@@ -36,8 +33,8 @@ public:
     virtual void start() = 0;
     virtual void stop () = 0;
 
-    [[nodiscard]] auto getAudio() const -> sPtrQueueList<float> { return audio ; }
-    [[nodiscard]] bool isActive() const                         { return active; }
+    [[nodiscard]] auto getAudio() const { return audio ; }
+    [[nodiscard]] bool isActive() const { return active; }
 
     
 };
