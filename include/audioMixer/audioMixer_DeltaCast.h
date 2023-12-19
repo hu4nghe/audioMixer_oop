@@ -10,8 +10,8 @@
 #pragma region Handles
 class boardHandle
 {
-    std::uint32_t  boardID{0};
-             void* handle {nullptr};
+    std::uint32_t  boardID = 0;
+             void* handle  = nullptr;
 public:
     boardHandle()
     {
@@ -19,7 +19,7 @@ public:
             throw std::runtime_error("Cannot open DELTA board handle.");
         else
         {
-            ULONG boardType{0};
+            ULONG boardType = 0;
             VHD_GetBoardProperty(handle, VHD_CORE_BP_BOARD_TYPE, &boardType);
             bool isHDMI = ((boardType == VHD_BOARDTYPE_HDMI)            ||
                            (boardType == VHD_BOARDTYPE_HDMI20)          ||
@@ -35,7 +35,7 @@ public:
 };
 class streamHandle
 {
-    void* handle{nullptr};
+    void* handle = nullptr;
 public: 
     streamHandle(const boardHandle& brdHdl)
     {
@@ -81,7 +81,7 @@ public:
             deltaCast::deltaCast         (const outputParameter& outputCfg)
 	:	module(outputCfg)
 {
-    ULONG boardNumber {0};
+    ULONG boardNumber  = 0;
     if (VHD_GetApiInfo(nullptr, &boardNumber))
         throw std::runtime_error("Cannot query VideoMaster information.");
     else
@@ -228,8 +228,11 @@ inline void deltaCast::streamConfig      ()
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_BUFFER_PACKING , VHD_BUFPACK_VIDEO_RGB_32);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
         /* Get auto-detected resolution */
-        ULONG Height{0}, Width{0}, RefreshRate{0}, PxlClk{0};
-        BOOL32 Interlaced{0};
+        ULONG Height      = 0, 
+              Width       = 0, 
+              RefreshRate = 0, 
+              PxlClk      = 0;
+        BOOL32 Interlaced = 0;
         VHD_DV_CS InputCS{};
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH ,         &Width);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT,         &Height);
@@ -251,12 +254,12 @@ inline void deltaCast::streamConfig      ()
 inline void deltaCast::startStream       ()
 {
     
-    HANDLE slotHandle   {nullptr};
-    BYTE*  pBuffer      {nullptr};
-    BYTE*  pAudioBuffer {nullptr};
-    ULONG  bufferSize   {0};
-    audio->push_back(audioQueue<float>(outputConfig));
+    HANDLE slotHandle   = nullptr;
+    BYTE*  pBuffer      = nullptr;
+    BYTE*  pAudioBuffer = nullptr;
+    ULONG  bufferSize   = 0;
 
+    audio->push_back(audioQueue<float>(outputConfig));
 
     /* Start stream */
     VHD_StartStream(streamHdl->getHandle());
@@ -306,7 +309,7 @@ inline auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,
     if (sourceSize % 2)
         throw std::invalid_argument("HDMI Audio Error : Invalid buffer size for 16 bit audio data.");
     else
-        for (auto i{0}, j{0}; i < sourceSize; i += 2, ++j)
+        for (auto i = 0, j = 0; i < sourceSize; i += 2, ++j)
             shortArr[j] = static_cast<std::uint32_t>(sourceAudio[i + 1]  << 8) |
                           static_cast<std::uint32_t>(sourceAudio[i    ]);
     

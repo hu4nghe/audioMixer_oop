@@ -2,6 +2,7 @@
 #define AUDIOMIXER_QTFF_H
 
 #include <fstream>
+#include <print>
 #include <vector>
 #include <map>
 #include <memory>
@@ -12,11 +13,11 @@
 template <typename F, typename Arg>
 concept Criteria = requires(F func, Arg arg){ { func(arg) } -> std::same_as<bool>; };
 
-
 //std::shared_ptr alias
 template <typename T>
 using sPtr = std::shared_ptr<T>;
 
+//convert 32bit int to fourCC code
 static std::string getStr(std::uint32_t code)
 {
     std::bitset<32> bits(code);
@@ -26,17 +27,56 @@ static std::string getStr(std::uint32_t code)
     return result;
 }
 
+class fileReader : public std::ifstream
+{
+public:
+    fileReader& readBigEndian(char* buffer, std::streamsize count)
+    {
+        if (!this->good())
+            throw std::ios_base::failure("Error reading from file.");
+        try
+        {
+            auto num = this->rdbuf()->sgetn(buffer, count);
+
+            for (auto i = 0; i < count / 2; ++i)
+                std::swap(buffer[i], buffer[count - 1 - i]);
+            if (num != count)
+            {
+                this->setstate(std::ios_base::eofbit | std::ios_base::failbit);
+                throw std::ios_base::failure("Error reading from file.");
+            }
+        }
+        catch (...)
+        {
+            this->setstate(std::ios_base::badbit | std::ios_base::failbit);
+            throw;  // Re-throw the caught exception
+        }
+
+        return *this;
+    }
+
+    template<typename T>
+    void readBigEndian(T& value)
+    {
+        this->read(reinterpret_cast<char*>(&value), sizeof(T));
+
+        for (size_t i = 0; i < sizeof(T) / 2; ++i)
+            std::swap(reinterpret_cast<std::uint8_t*>(&value)[i                ], 
+                      reinterpret_cast<std::uint8_t*>(&value)[sizeof(T) - 1 - i]);
+    }
+};
+
 class atom : public std::enable_shared_from_this<atom> 
 {
 public:
-         std::uint32_t  atomSize;
-         std::uint32_t  atomType;
-         std::size_t    posBegin;
-    sPtr<std::ifstream> file;
+    std::uint32_t    atomSize;
+    std::uint32_t    atomType;
+    std::  size_t    posBegin;
+    sPtr<fileReader> file;
     std::map<std::string, sPtr<atom>> children;
 
     atom() = default;
-    atom(sPtr<std::ifstream> fileStream)
+    atom(sPtr<fileReader> fileStream)
     {
         try
         {

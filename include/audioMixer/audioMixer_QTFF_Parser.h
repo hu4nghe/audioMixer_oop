@@ -49,11 +49,13 @@ public:
     {
         this->read(reinterpret_cast<char*>(&value), sizeof(T));
         for (size_t i = 0; i < sizeof(T) / 2; ++i)
-        std::swap(reinterpret_cast<uint8_t*>(&value)[i], reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
+        std::swap(reinterpret_cast<uint8_t*>(&value)[i], 
+                  reinterpret_cast<uint8_t*>(&value)[sizeof(T) - 1 - i]);
     }
 };
 
-using sPtrFile = std::shared_ptr<fileReader>;
+template <typename T>
+using sPtr = std::shared_ptr<T>;
 
 static std::string getStr(std::uint32_t code)
 {
@@ -67,13 +69,13 @@ static std::string getStr(std::uint32_t code)
 class atom
 {
 protected:
-	std::uint32_t  atomSize;
-	std::uint32_t  atomType;
-    std::  size_t  posBegin;
-         sPtrFile  file;
+	std::uint32_t     atomSize;
+	std::uint32_t     atomType;
+    std::  size_t     posBegin;
+    sPtr<fileReader>  file;
 public:
     atom() = default;
-    atom(sPtrFile fileStream)
+    atom(sPtr<fileReader> fileStream)
     {
         file = fileStream;
         try
@@ -81,7 +83,7 @@ public:
             posBegin = file->tellg();
             file->readBigEndian(atomSize);
             file->readBigEndian(atomType);
-            std::print("atomType : {}\nsize : {}\n", getStr(atomType), atomSize);
+            //std::print("atomType : {}\nsize : {}\n", getStr(atomType), atomSize);
         }
         catch (const std::exception& e)
         {
@@ -108,13 +110,14 @@ public:
     [[nodiscard]] std::uint32_t end    () const noexcept{ return posBegin + atomSize; }
 };
 
-class QTFF
+class QTFF : public module
 {
-    sPtrFile fileStream;
+    sPtr<fileReader> fileStream;
     std::vector<atom> soundTracksMdia;
-    sPtrQueueList<float> audio;
+    std::size_t eof;
 public:
-    QTFF(const std::string& filePath)
+    QTFF(const std::string& filePath, const outputParameter& outputConfig)
+        : module(outputConfig)
     {
         try
         {
@@ -125,12 +128,15 @@ public:
             fileStream->open(filePath, std::ios::binary);
             if (!fileStream->is_open())
                 throw std::runtime_error("Failed to open file.");
+            
+            fileStream->seekg(0, std::ios::end);
+            eof = fileStream->tellg();
+            fileStream->seekg(0, std::ios::beg);
 
             atom fileType(fileStream);
             if (!fileType.typeIs("ftyp"))
                 throw std::runtime_error("Not a valid QTFF file.");
             fileType.skip();
-            //audio = std::make_shared<std::vector<audioQueue<float>>>(outputCfg);
         }
         catch (const std::exception& e)
         {
@@ -138,10 +144,11 @@ public:
         }
     }
    ~QTFF() { fileStream->close(); }
-    atom searchAtom     (std::string_view code)
+    void start() override { this->searchAudioInfo(); }
+    void stop() override {}
+
+    atom searchAtom     (std::string_view code) const
     {
-        fileStream->seekg(0, std::ios::end);
-        std::size_t eof = fileStream->tellg();
         bool exit = false;
         while(!exit)
         {
@@ -154,6 +161,37 @@ public:
                 exit = true;
         }
         return atom();
+    }
+    void findSoundTrack(atom& track)
+    {
+        if (getStr(track.type()) != "trak")
+            throw std::invalid_argument("Not a trak atom.");
+        auto mdiaAtom = searchAtom("mdia");
+        auto hdlrAtom = searchAtom("hdlr");
+        /*
+         * hdlr atom structure
+         * data fields            atomSize    pos   status      diffSeekg
+         * ----------------------------------------------------------
+         * Size                   4       0     read
+         * Type                   4       4     read
+         * -----------------------------> 8     current pos
+         * Version                1       8     ignore
+         * Flags                  3       9     ignore
+         * Component atomType     4       12    ignore
+         * Conponent subtype      4       16    target          8
+         * ...
+         */
+        std::uint32_t trackType = 0;
+        fileStream->seekg(8, std::ios::cur);
+        fileStream->readBigEndian(trackType);
+        if (getStr(trackType) == "soun")
+        {
+            hdlrAtom.skip();
+            auto minfAtom = searchAtom("minf");
+            auto stblAtom = searchAtom("stbl");
+            soundTracksMdia.push_back(stblAtom);
+        }
+        track.skip();
     }
     void searchAudioInfo()
     {
@@ -175,16 +213,16 @@ public:
                 exit = true;
             }
         }
-        for (auto& mdia : soundTracksMdia)
+        for (auto& stbl : soundTracksMdia)
         {
-            fileStream->seekg(mdia.head(), std::ios::beg);
-            auto minfAtom = searchAtom("minf");
-            auto stblAtom = searchAtom("stbl");
-            auto stsdAtom = searchAtom("stsd");
+            //Read offset : head of stbl + 4 byte size + 4 bit type.
+            std::size_t stblHeadOffset = static_cast<size_t>(stbl.head()) + 8;
+            fileStream->seekg(stblHeadOffset, std::ios::beg);
             
+            auto stsdAtom = searchAtom("stsd");
             /*
              * stsd atom structure
-             * data fields            atomSize    pos   status          diff
+             * data fields            atomSize    pos   status      diffSeekg
              * ----------------------------------------------------------
              * Size                   4       0     read
              * Type                   4       4     read
@@ -195,15 +233,15 @@ public:
              * ...
              */
             fileStream->seekg(4, std::ios::cur);
-            std::uint32_t nbentries = 0;
-            fileStream->readBigEndian(nbentries);
+            std::uint32_t nbEntriesStsd = 0;
+            fileStream->readBigEndian(nbEntriesStsd);
 
-            for (auto i = 0; i < nbentries; i++)
+            for (auto i = 0; i < nbEntriesStsd; i++)
             {
                 auto mp4aAtom = searchAtom("mp4a");
                 /*
                  * mp4a layout
-                 * data fields            atomSize    pos   status          diff
+                 * data fields            atomSize    pos   status      diffSeekg
                  * ----------------------------------------------------------
                  * Size                   4       0     read
                  * Type                   4       4     read
@@ -221,48 +259,147 @@ public:
                 std::uint16_t channelCount = 0;
                 fileStream->seekg(16, std::ios::cur);//seek target(1)
                 fileStream->readBigEndian(channelCount);
-                std::print("channelNum : {}\n", channelCount);
+                std::print("channel number : {}\n", channelCount);
 
                 //target(2)
-                std::uint16_t sampleSize = 0;
-                fileStream->readBigEndian(sampleSize);
-                std::print("sampleSize : {}\n", sampleSize);
+                std::uint16_t bitDepth = 0;
+                fileStream->readBigEndian(bitDepth);
+                std::print("bit depth      : {}\n", bitDepth);
 
                 std::uint32_t sampleRate = 0;
                 fileStream->seekg(2, std::ios::cur);//seek target(3)
                 fileStream->readBigEndian(sampleRate);
-                std::print("sampleRate : {}\n", sampleRate);
-                
+                std::print("sample rate    : {}\n\n", sampleRate);
             }
-            //mp4aAtom.skip();
+            stsdAtom.skip();
+
+            auto stszAtom = searchAtom("stsz");
+            /*
+             * stsz atom structure
+             * data fields            atomSize    pos   status      diffSeekg
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Sample size            4       12    target(1)       4
+             * Number of entries      4       16    target(2)       0
+             * Sample size table      4*n     20    target(3)       0
+             * ...
+             */
+            fileStream->seekg(4, std::ios::cur);
+            std::uint32_t sampleSize = 0;
+            fileStream->readBigEndian(sampleSize);
+
+            std::vector<uint32_t> stszTable;
+
+            if (sampleSize == 0)//sizes are stored in the sample size table.
+            {
+                std::uint32_t nbEntriesStsz = 0;
+                fileStream->readBigEndian(nbEntriesStsz);
+                stszTable.reserve(nbEntriesStsz);
+                std::uint32_t size = 0;
+                for (auto i = 0; i < nbEntriesStsz; i++)
+                {
+                    fileStream->readBigEndian(size);
+                    stszTable.push_back(size);
+                }
+                /*std::print("stsz table : \n");
+                for (auto& i : stszTable)
+                    std::print("{}\n", i);*/
+            }
+            stszAtom.skip();
+
+            auto stcoAtom = searchAtom("stco");
+            /*
+             * stco atom structure
+             * data fields            atomSize    pos   status      diffSeekg
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Number of entries      4       12    target(1)       4
+             * Sample size table      4*n     16    target(2)       0
+             */
+            fileStream->seekg(4, std::ios::cur);
+            std::uint32_t nbChunk = 0;
+            fileStream->readBigEndian(nbChunk);
+            std::vector<uint32_t> stcoTable(nbChunk);
+
+            std::uint32_t chunkOffset = 0;
+            for (auto i = 0; i < nbChunk; i++)
+            {
+                fileStream->readBigEndian(chunkOffset);
+                stcoTable[i] = chunkOffset;
+            }
+            /*std::print("\n\nstco table : \n");
+            for (auto& i : stcoTable)
+                std::print("{}\n", i);*/
+
+            //go back to read stsc atom
+            fileStream->seekg(stbl.head() + 8, std::ios::beg);
+            auto stscAtom = searchAtom("stsc");
+            /*
+             * stsc atom structure
+             * data fields            atomSize    pos   status      diffSeekg
+             * ----------------------------------------------------------
+             * Size                   4       0     read
+             * Type                   4       4     read
+             * -----------------------------> 8     current pos
+             * Version                1       8     ignore
+             * Flags                  3       9     ignore
+             * Number of entries      4       12    target(1)       4
+             * Sample-to-chunk table  4*3*n   16    target(2)       0
+             */
+
+            std::uint32_t nbEntriesStsc = 0;
+            fileStream->seekg(4, std::ios::cur);
+            fileStream->readBigEndian(nbEntriesStsc);
+            std::uint32_t temp = 0;
+
+            std::vector<std::uint32_t> firstChunk         (nbEntriesStsc);
+            std::vector<std::uint32_t> samplesPerChunk    (nbEntriesStsc);
+            std::vector<std::uint32_t> sampleDescriptionID(nbEntriesStsc);
+            std::vector<std::uint32_t> completeTable      (nbChunk + 1);
+
+            for(auto i = 0; i < nbEntriesStsc;i++)
+            {
+                fileStream->readBigEndian(temp);
+                firstChunk         [i]  = temp;
+                fileStream->readBigEndian(temp);
+                samplesPerChunk    [i]  = temp;
+                fileStream->readBigEndian(temp);
+                sampleDescriptionID[i]  = temp;
+            }
+            
+            for (auto i = 0; i < firstChunk.size(); i++)
+                if(i >= 1)
+                    if (firstChunk[i] - firstChunk[i - 1] != 1)
+                        for (auto j = firstChunk[i - 1]; j < firstChunk[i] - 1; j++)
+                            completeTable[j + 1] = samplesPerChunk[i - 1];
+                    else
+                        completeTable[i + 1] = samplesPerChunk[i];
+                else
+                    completeTable[i + 1] = samplesPerChunk[i];
+
+
+            auto sum = 0;
+            for (auto& i : completeTable)
+            {
+                sum += i;
+                std::print("complete table : {}\n", i);
+            }
+                
+
+            stscAtom.skip();
+
+            std::print("stsz table count : {}\nstco count : {}\ntable sum : {}\n", stszTable.size(), stcoTable.size(),sum);
+            
             break;
         }
-    }
-    void findSoundTrack(atom& track)
-    {
-        if (getStr(track.type()) != "trak")
-            throw std::invalid_argument("Not a trak atom.");
-        auto mdiaAtom = searchAtom("mdia");
-        auto hdlrAtom = searchAtom("hdlr");
-        /*
-         * hdlr atom structure
-         * data fields            atomSize    pos   status      diff
-         * ----------------------------------------------------------
-         * Size                   4       0     read
-         * Type                   4       4     read
-         * -----------------------------> 8     current pos
-         * Version                1       8     ignore
-         * Flags                  3       9     ignore
-         * Component atomType     4       12    ignore
-         * Conponent subtype      4       16    target          8             
-         * ...
-         */
-        std::uint32_t trackType = 0;
-        fileStream->seekg(8, std::ios::cur);
-        fileStream->readBigEndian(trackType);
-        if (getStr(trackType) == "soun")
-            soundTracksMdia.push_back(mdiaAtom);
-        track.skip();
     }
 };
 
