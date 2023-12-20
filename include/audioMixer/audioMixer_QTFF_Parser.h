@@ -147,7 +147,7 @@ public:
     void start() override { this->searchAudioInfo(); }
     void stop() override {}
 
-    atom searchAtom     (std::string_view code) const
+    atom searchAtom    (std::string_view code) const
     {
         bool exit = false;
         while(!exit)
@@ -363,7 +363,8 @@ public:
             std::vector<std::uint32_t> firstChunk         (nbEntriesStsc);
             std::vector<std::uint32_t> samplesPerChunk    (nbEntriesStsc);
             std::vector<std::uint32_t> sampleDescriptionID(nbEntriesStsc);
-            std::vector<std::uint32_t> completeTable      (nbChunk + 1);
+            std::vector<std::uint32_t> completeTable;
+            completeTable.reserve(nbChunk);
 
             for(auto i = 0; i < nbEntriesStsc;i++)
             {
@@ -375,32 +376,32 @@ public:
                 sampleDescriptionID[i]  = temp;
             }
             
-            for (auto i = 0; i < firstChunk.size(); i++)
-                if(i >= 1)
-                    if (firstChunk[i] - firstChunk[i - 1] != 1)
-                        for (auto j = firstChunk[i - 1]; j < firstChunk[i] - 1; j++)
-                            completeTable[j + 1] = samplesPerChunk[i - 1];
-                    else
-                        completeTable[i + 1] = samplesPerChunk[i];
-                else
-                    completeTable[i + 1] = samplesPerChunk[i];
-
-
-            auto sum = 0;
-            for (auto& i : completeTable)
+            for (std::size_t i = 0; i < nbEntriesStsc; i++)
             {
-                sum += i;
-                std::print("complete table : {}\n", i);
+                if (i == 0)
+                {
+                    completeTable.push_back(samplesPerChunk[i]);
+                    continue;
+                }
+                else
+                {
+                    auto diff = firstChunk[i] - firstChunk[i - 1];
+                    if (diff > 1)
+                        for (std::size_t j = 1; j < diff; j++)
+                            completeTable.push_back(samplesPerChunk[i - 1]);
+                    completeTable.push_back(samplesPerChunk[i]);
+                }
             }
-                
-
             stscAtom.skip();
 
-            std::print("stsz table count : {}\nstco count : {}\ntable sum : {}\n", stszTable.size(), stcoTable.size(),sum);
-            
             break;
         }
+    }
+    void seekData()
+    {
+
     }
 };
 
 #endif
+
