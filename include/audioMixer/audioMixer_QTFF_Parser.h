@@ -292,10 +292,12 @@ public:
             std::uint32_t sampleSize = 0;
             fileStream->readBigEndian(sampleSize);
 
+            bool uniqueSampleSize = true;
             std::vector<uint32_t> stszTable;
 
             if (sampleSize == 0)//sizes are stored in the sample size table.
             {
+                uniqueSampleSize = false;
                 std::uint32_t nbEntriesStsz = 0;
                 fileStream->readBigEndian(nbEntriesStsz);
                 stszTable.reserve(nbEntriesStsz);
@@ -305,9 +307,6 @@ public:
                     fileStream->readBigEndian(size);
                     stszTable.push_back(size);
                 }
-                /*std::print("stsz table : \n");
-                for (auto& i : stszTable)
-                    std::print("{}\n", i);*/
             }
             stszAtom.skip();
 
@@ -335,9 +334,6 @@ public:
                 fileStream->readBigEndian(chunkOffset);
                 stcoTable[i] = chunkOffset;
             }
-            /*std::print("\n\nstco table : \n");
-            for (auto& i : stcoTable)
-                std::print("{}\n", i);*/
 
             //go back to read stsc atom
             fileStream->seekg(stbl.head() + 8, std::ios::beg);
@@ -393,14 +389,26 @@ public:
                 }
             }
             stscAtom.skip();
+            /*
+            //start of audio data extraction
+            std::vector<std::int16_t> aacData;
+            std::int16_t sampleTemp = 0;
+            std::size_t sampleReadCount = 0;
+            for (auto&& [chunkOfst, samplePerChunk] : std::views::zip(stcoTable, completeTable))
+            {
+                fileStream->seekg(chunkOfst, std::ios::beg);
+                for (int i = 0; i < samplePerChunk; i++)
+                {
+                    for(int j = 0; j < )
+                }
+            }*/
 
             break;
         }
     }
-    void seekData()
-    {
 
-    }
+    
+   
 };
 
 #endif

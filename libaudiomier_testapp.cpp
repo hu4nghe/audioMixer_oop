@@ -73,7 +73,7 @@ int main()
 
 	outputParameter outCfg;
 
-	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau dossier\\Music\\N31.mp4");
+	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau dossier\\Music\\MKV5.mov");
 	QTFF fileA(filepath,outCfg);
 	fileA.start();
 
