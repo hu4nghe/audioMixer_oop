@@ -7,15 +7,15 @@
 #include "audioMixer_base.h"
 #include "Processing.NDI.Lib.h"
 
-constexpr auto NDI_TIMEOUT = 1000;
+constexpr auto NDI_TIMEOUT = 1000; 
 
 class NDIFinder
 {
-	NDIlib_find_instance_t finder {};
+	NDIlib_find_instance_t finder{};
 public:
 	NDIFinder()
 	{
-		NDIlib_find_create_t findCfg {};
+		NDIlib_find_create_t findCfg{};
 		finder = NDIlib_find_create_v2(&findCfg);
 		if (!finder)//nullptr in case of failure.
 			throw std::runtime_error("Failed to create NDI finder !");
@@ -36,9 +36,9 @@ public:
    ~NDIFinder(){ NDIlib_find_destroy(finder); }
     auto findSrc(std::uint32_t NDI_TIMEOUT) -> std::vector<NDIlib_source_t>
 	{
-		const NDIlib_source_t* sources		 = nullptr;
-				std::uint32_t  sourceNumber	 = 0;
-						 bool  found		 = false;
+		const NDIlib_source_t* sources	    = nullptr;
+				std::uint32_t  sourceNumber = 0;
+						 bool  found	    = false;
 
 		//try to find sources
 		while (!found)
@@ -55,11 +55,11 @@ public:
 
 class NDIReceiver
 {
-	NDIlib_recv_instance_t receiver {};
+	NDIlib_recv_instance_t receiver{};
 public:
 	NDIReceiver(const NDIlib_source_t& src)
 	{
-		NDIlib_recv_create_v3_t recvConfig {};
+		NDIlib_recv_create_v3_t recvConfig{};
 		recvConfig.p_ndi_recv_name		= src.p_ndi_name;
 		recvConfig.source_to_connect_to = src;
 		receiver = NDIlib_recv_create_v3(&recvConfig);
@@ -129,50 +129,60 @@ void NDI::stop	   ()
 }
 void NDI::srcSearch()
 {
-	if (!active)
-		throw std::logic_error("NDI lib is not running !");
-	
-	NDIFinder audioFinder  {};
-		 auto sourcesFound { audioFinder.findSrc(NDI_TIMEOUT) };	       		  
-
-	//print all sources found
-	std::print("NDI sources :\n");
-	for (auto& i : sourcesFound)
-		std::print("Name : {}	\nIP   : {}\n\n", 
-					i.p_ndi_name, i.p_url_address);
-
-	//let user select NDI sources that they want.
-	bool sourceMatched  = false;
-	bool selectAll	    = false;
-	std::print("Please enter the IP of the source that you want to connect to.\nA(ll)	E(nd)\n");
-	do
+	try
 	{
-		sourceMatched = false;
+		if (!active)
+			throw std::logic_error("NDI lib is not running !");
 
-		std::string url;		
-		std::cin >> url;
+		NDIFinder audioFinder{};
+		auto sourcesFound{ audioFinder.findSrc(NDI_TIMEOUT) };
 
-		if (url == "A" || url == "a")
-			selectAll = true;
 
+		//print all sources found
+		std::print("NDI sources :\n");
 		for (auto& i : sourcesFound)
+			std::print("Name : {}	\nIP   : {}\n\n",
+				i.p_ndi_name, i.p_url_address);
+
+		//let user select NDI sources that they want.
+		bool sourceMatched = false;
+		bool selectAll = false;
+		std::print("Please enter the IP of the source that you want to connect to.\nA(ll)	E(nd)\n");
+		do
 		{
-			if (url == i.p_url_address || selectAll)
+			sourceMatched = false;
+
+			std::string url;
+			std::cin >> url;
+
+			if (url == "A" || url == "a")
+				selectAll = true;
+
+			for (auto& i : sourcesFound)
 			{
-				recvList.push_back(NDIReceiver(i));
-				std::print("{} selected.\n", i.p_ndi_name);
-				sourceMatched = true;
+				if (url == i.p_url_address || selectAll)
+				{
+					recvList.push_back(NDIReceiver(i));
+					std::print("{} selected.\n", i.p_ndi_name);
+					sourceMatched = true;
+				}
 			}
-		}
-		if (url == "E" || url == "e" || selectAll)
-		{
-			std::print("Sources confimed.\n");
-			break;
-		}
-		if (!sourceMatched) std::print("No source matched! Please try again.\n");
-	} while (true);
-	//create a audioQueue for each selected NDI receiver.
-	audio->resize(recvList.size(), audioQueue<float>(outputConfig));
+			if (url == "E" || url == "e" || selectAll)
+			{
+				std::print("Sources confimed.\n");
+				break;
+			}
+			if (!sourceMatched) std::print("No source matched! Please try again.\n");
+		} while (true);
+		//create a audioQueue for each selected NDI receiver.
+		audio->resize(recvList.size(), audioQueue<float>(outputConfig));
+	}
+	catch (const std::exception& err)
+	{
+		std::print("NDI error : {}\n", err.what());
+		this->stop();
+		this->start();
+	}
 }
 void NDI::recvAudio()
 {

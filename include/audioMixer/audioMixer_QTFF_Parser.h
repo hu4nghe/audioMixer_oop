@@ -16,6 +16,17 @@ constexpr std::uint32_t moovCode = 0x6D6F6F76;
 constexpr std::uint32_t trakCode = 0x7472616B;
 constexpr std::uint32_t sounCode = 0x736F756E;
 
+template <typename T>
+using sPtr = std::shared_ptr<T>;
+static std::string getStr(std::uint32_t code)
+{
+    std::bitset<32> bits(code);
+    std::string result;
+    for (int i = 24; i >= 0; i -= 8)
+        result += static_cast<char>((bits >> i).to_ulong() & 0xFF);
+    return result;
+}
+
 class fileReader : public std::ifstream
 {
 public:
@@ -54,18 +65,6 @@ public:
     }
 };
 
-template <typename T>
-using sPtr = std::shared_ptr<T>;
-
-static std::string getStr(std::uint32_t code)
-{
-    std::bitset<32> bits(code);
-    std::string result;
-    for (int i = 24; i >= 0; i -= 8)
-        result += static_cast<char>((bits >> i).to_ulong() & 0xFF);
-    return result;
-}
-
 class atom
 {
 protected:
@@ -74,7 +73,6 @@ protected:
     std::  size_t     posBegin;
     sPtr<fileReader>  file;
 public:
-    atom() = default;
     atom(sPtr<fileReader> fileStream)
     {
         file = fileStream;
@@ -145,7 +143,7 @@ public:
     }
    ~QTFF() { fileStream->close(); }
     void start() override { this->searchAudioInfo(); }
-    void stop() override {}
+    void stop () override {}
 
     atom searchAtom    (std::string_view code) const
     {
@@ -160,7 +158,7 @@ public:
             if (header.end() == eof)
                 exit = true;
         }
-        return atom();
+        throw std::runtime_error("atom not found.");
     }
     void findSoundTrack(atom& track)
     {
