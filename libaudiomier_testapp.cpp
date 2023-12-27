@@ -7,7 +7,7 @@
 /*
 * function for output configurations : sample rate, channel number, buffersize(in second)
 */
-outputParameter configuration()
+static outputParameter configuration()
 {
 	outputParameter outConfig {};
 			   char ch		  {};
@@ -42,7 +42,7 @@ outputParameter configuration()
 	}
 	return outConfig;
 }
-bool is_big_endian(void)
+static bool is_big_endian(void)
 {
 	union {
 		uint32_t i;
@@ -52,30 +52,17 @@ bool is_big_endian(void)
 	return bint.c[0] == 1;
 }
 
-class test
-{
-	std::shared_ptr<int> ptr;
-public:
-	test(std::shared_ptr<int> integer) : ptr(integer) {}
-	void print()
-	{
-		std::print("value inside class is {}\n",*ptr);
-	}
-};
-
-
 int main()
 {
-	/*
 	auto config = configuration();
 	audioMixer m1(config);
-	m1.startStream();*/
+	m1.startStream();
 
-	outputParameter outCfg;
+	/*outputParameter outCfg;
 
 	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau dossier\\Music\\MKV5.mov");
 	QTFF fileA(filepath,outCfg);
-	fileA.start();
+	fileA.start();*/
 
 	return 0;
 }

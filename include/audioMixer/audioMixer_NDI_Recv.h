@@ -18,7 +18,7 @@ public:
 		NDIlib_find_create_t findCfg{};
 		finder = NDIlib_find_create_v2(&findCfg);
 		if (!finder)//nullptr in case of failure.
-			throw std::runtime_error("Failed to create NDI finder !");
+			throw modFatalErr("Failed to create NDI finder !");
 	}
 	NDIFinder(const bool  showLocalSources,
 			  const char* pGroups)
@@ -31,7 +31,7 @@ public:
 
 		finder = NDIlib_find_create_v2(&findCfg);
 		if (!finder)//nullptr in case of failure.
-			throw std::runtime_error("Failed to create NDI finder !");
+			throw modFatalErr("Failed to create NDI finder !");
 	}
    ~NDIFinder(){ NDIlib_find_destroy(finder); }
     auto findSrc(std::uint32_t NDI_TIMEOUT) -> std::vector<NDIlib_source_t>
@@ -47,9 +47,13 @@ public:
 			sources = NDIlib_find_get_current_sources(finder, &sourceNumber);
 			found   = true;
 		}
-
-		std::vector<NDIlib_source_t> sourcesFound(sources,sources+sourceNumber);
-		return sourcesFound;
+		if (sourceNumber == 0)
+			throw modFatalErr("No source found.");
+		else
+		{
+			std::vector<NDIlib_source_t> sourcesFound(sources, sources + sourceNumber);
+			return sourcesFound;
+		}
 	}
 };
 
@@ -64,7 +68,7 @@ public:
 		recvConfig.source_to_connect_to = src;
 		receiver = NDIlib_recv_create_v3(&recvConfig);
 		if(!receiver)
-			throw std::runtime_error("Failed to create NDI receiver !");
+			throw modFatalErr("Failed to create NDI receiver !");
 	}
 	template <audio_t T>
 	void extractAudio(audioQueue<T>& audio)
@@ -109,7 +113,7 @@ public:
 	void recvAudio();
 };
 
-#pragma region IMPL NDI Recv
+#pragma region IMPL NDI
 	 NDI::NDI	   (const outputParameter& outputCfg)
 	:	module(outputCfg) {}
 void NDI::start	   ()
@@ -118,8 +122,31 @@ void NDI::start	   ()
 	std::print("NDI Module is activated.\n");
 	active = true;
 	
-	this->srcSearch(); 
-	this->recvAudio();
+	try
+	{
+		this->srcSearch();
+		this->recvAudio();
+	}
+	catch (const modFatalErr& fatalErr)
+	{
+		std::print("{}\n", fatalErr.what());
+		std::print("Q(uit)  R(estart)\n");
+		char ch{};
+		std::cin >> ch;
+		switch (std::toupper(ch))
+		{
+		case 'Q':
+			stop();
+			break;
+		case 'R':
+			stop();
+			start();
+			break;
+		default:
+			std::print("invalide choice!\n");
+		}
+		start();
+	}
 }
 void NDI::stop	   ()
 {
@@ -132,11 +159,10 @@ void NDI::srcSearch()
 	try
 	{
 		if (!active)
-			throw std::logic_error("NDI lib is not running !");
+			throw modFatalErr("NDI lib is not running !");
 
 		NDIFinder audioFinder{};
 		auto sourcesFound{ audioFinder.findSrc(NDI_TIMEOUT) };
-
 
 		//print all sources found
 		std::print("NDI sources :\n");
@@ -177,11 +203,17 @@ void NDI::srcSearch()
 		//create a audioQueue for each selected NDI receiver.
 		audio->resize(recvList.size(), audioQueue<float>(outputConfig));
 	}
-	catch (const std::exception& err)
+	catch (const modFatalErr& fatalErr)
 	{
-		std::print("NDI error : {}\n", err.what());
-		this->stop();
-		this->start();
+		std::print("NDI fatal error : {}\n", fatalErr.what());
+		throw fatalErr;
+	}
+	catch (const modObjNotFound& nfErr)
+	{
+		std::print("NDI error : {}.\n", nfErr.what());
+		std::print("Press any key to try again.\n");
+		std::cin.ignore();
+		this->srcSearch();
 	}
 }
 void NDI::recvAudio()
@@ -191,6 +223,6 @@ void NDI::recvAudio()
 			receiver.extractAudio<float>(audio);
 }
 #pragma endregion
-//IMPL NDI Recv
+//IMPL NDI
 
 #endif//NDI_RECV_MODULE_H

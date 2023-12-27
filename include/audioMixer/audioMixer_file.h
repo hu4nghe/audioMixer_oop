@@ -43,30 +43,43 @@ void soundFile::stop	  ()
 }
 void soundFile::selectFile()
 {
-	std::print("Please enter the path of the sound file, enter end to confirm.\n");
-	std::string filePathStr;
-	do
+	try
 	{
-		std::getline(std::cin >> std::ws, filePathStr);
-		if (filePathStr == "end")
+		std::print("Please enter the path of the sound file, enter end to confirm.\n");
+		std::string filePathStr;
+		do
 		{
-			std::print("Sound files confimed.\n");
-			break;
-		}
-		else
-		{
-			fs::path filePath(filePathStr);
-			if (fs::exists(filePath))
+			std::getline(std::cin >> std::ws, filePathStr);
+			if (filePathStr == "end")
 			{
-				std::print("Sound file seletcted : {}.\n", filePath.filename().string());
-				pathList.push_back(filePath);
+				std::print("Sound files confimed.\n");
+				break;
 			}
 			else
 			{
-				std::print("Error : No such file or dictory.\n");
+				fs::path filePath(filePathStr);
+				if (fs::exists(filePath))
+				{
+					std::print("Sound file seletcted : {}.\n", filePath.filename().string());
+					pathList.push_back(filePath);
+				}
+				else
+					throw modObjNotFound("Error : No such file or dictory.");
 			}
-		}
-	} while (true);
+		} while (true);
+	}
+	catch (const modObjNotFound& err)
+	{
+		std::print("sndfile error : {}.\n", err.what());
+		std::print("Press any key to try again.\n");
+		std::cin.ignore();
+		this->selectFile();
+	}
+	catch (const modFatalErr& err)
+	{
+		std::print("libsndfile fatal error : {}\n", err.what());
+		throw err;
+	}
 }
 void soundFile::readFile  ()
 {
@@ -76,7 +89,6 @@ void soundFile::readFile  ()
 		SndfileHandle sndFile(i.string());
 		fileHandleList.push_back(sndFile);
 	}
-
 	for (auto& i : fileHandleList)
 	{
 		const std::size_t bufferSize = i.frames() * i.channels() + 100;

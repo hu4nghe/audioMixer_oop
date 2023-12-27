@@ -2,8 +2,10 @@
 #define AUDIOMIXER_BASE_H
 
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <print>
+#include <string>
 
 #include "audioMixer_queue.h"
 
@@ -34,6 +36,20 @@ public:
     [[nodiscard]] auto getAudio() const { return audio ; }
     [[nodiscard]] bool isActive() const { return active; }
 };
+
+class modFatalErr : public std::runtime_error
+{
+public:
+    modFatalErr(const char* message) : std::runtime_error(message){}
+    const char* what() const noexcept override{ return std::runtime_error::what();}
+};
+class modObjNotFound : public std::logic_error
+{
+public:
+    modObjNotFound(const char* message) : std::logic_error(message){}
+    const char* what() const noexcept override { return std::logic_error::what(); }
+};
+
 /**
  * @brief
  *
@@ -42,4 +58,12 @@ public:
 template<typename U>
 concept inputMod_t = std::is_base_of<audioMixerModule_base, U>::value;
 using module = audioMixerModule_base;
+
+/*
+ * alias 
+ */
+template <typename T>
+using sPtr = std::shared_ptr<T>;
+
+
 #endif//AUDIO_BASE_H

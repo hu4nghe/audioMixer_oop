@@ -16,8 +16,6 @@ constexpr std::uint32_t moovCode = 0x6D6F6F76;
 constexpr std::uint32_t trakCode = 0x7472616B;
 constexpr std::uint32_t sounCode = 0x736F756E;
 
-template <typename T>
-using sPtr = std::shared_ptr<T>;
 static std::string getStr(std::uint32_t code)
 {
     std::bitset<32> bits(code);

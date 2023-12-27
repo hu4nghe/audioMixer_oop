@@ -26,7 +26,7 @@ public:
     boardHandle()
     {
         if (VHD_OpenBoardHandle(boardID, &hdl, nullptr, 0))
-            throw std::runtime_error("Cannot open DELTA board handle.");
+            throw modFatalErr("Cannot open DELTA board handle.");
         else
         {
             ULONG boardType = 0;
@@ -36,7 +36,7 @@ public:
                            (boardType == VHD_BOARDTYPE_FLEX_HMI)        ||
                            (boardType == VHD_BOARDTYPE_MIXEDINTERFACE));
             if (!isHDMI)
-                throw std::runtime_error("ERROR : The selected board is not a HDMI or DVI board");
+                throw modFatalErr("Delta Cast error : The selected board is not a HDMI or DVI board");
         }
     }
    ~boardHandle(){ VHD_CloseBoardHandle(hdl); }
@@ -48,10 +48,10 @@ public:
     streamHandle(const boardHandle& brdHdl)
     {
         if (VHD_OpenStreamHandle(brdHdl.getHandle(), VHD_ST_RX0, VHD_DV_STPROC_JOINED, nullptr, &hdl, nullptr))
-            throw std::runtime_error("ERROR : Cannot open RX0 stream on HDMI / DVI board handle.");
+            throw modFatalErr("Delta Cast error : Cannot open RX0 stream on HDMI / DVI board handle.");
         else
             if (VHD_SetStreamProperty(hdl, VHD_DV_SP_MODE, VHD_DV_MODE_HDMI))
-                throw std::runtime_error("ERROR : Cannot configure RX0 stream primary mode.");
+                throw modFatalErr("Delta Cast error : Cannot configure RX0 stream primary mode.");
     }
    ~streamHandle(){ VHD_CloseStreamHandle(hdl); }
 };
@@ -85,18 +85,26 @@ public:
             deltaCast::deltaCast         (const outputParameter& outputCfg)
 	:	module(outputCfg)
 {
-    ULONG boardNumber  = 0;
-    if (VHD_GetApiInfo(nullptr, &boardNumber))
-        throw std::runtime_error("Cannot query VideoMaster information.");
-    else
+    try
     {
-        if(boardNumber)
-        {
-            boardHdl  = std::make_unique< boardHandle>();
-            streamHdl = std::make_unique<streamHandle>(*boardHdl);
-        }    
+        ULONG boardNumber = 0;
+        if (VHD_GetApiInfo(nullptr, &boardNumber))
+            throw modFatalErr("Cannot query VideoMaster information.");
         else
-            throw std::runtime_error("No Delta board detected.");
+        {
+            if (boardNumber)
+            {
+                boardHdl = std::make_unique< boardHandle>();
+                streamHdl = std::make_unique<streamHandle>(*boardHdl);
+            }
+            else
+                throw modFatalErr("No Delta board detected.");
+        }
+    }
+    catch (const modFatalErr& fatalErr)
+    {
+        std::print("Delta Cast fatal error : {}\n", fatalErr.what());
+        throw fatalErr;
     }
 }
 inline auto deltaCast::getSampleRate     () const
@@ -223,8 +231,31 @@ inline auto deltaCast::getChannelNumbers () const
 }
 inline void deltaCast::start             ()
 {
-    this->streamConfig();
-    this->startStream ();
+    try
+    {
+        this->streamConfig();
+        this->startStream();
+    }
+    catch (const modFatalErr& fatalErr)
+    {
+        std::print("{}\n", fatalErr.what());
+        std::print("Q(uit)  R(estart)\n");
+        char ch {};
+        std::cin >> ch;
+        switch (std::toupper(ch))
+        {
+        case 'Q':
+            stop();
+            break;
+        case 'R':
+            stop();
+            start();
+            break;
+        default:
+            std::print("invalide choice!\n");
+        }
+        start();
+    }
 }
 inline void deltaCast::stop              ()
 {
@@ -244,29 +275,29 @@ inline void deltaCast::streamConfig      ()
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_BUFFER_PACKING , VHD_BUFPACK_VIDEO_RGB_32);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
         /* Get auto-detected resolution */
-        ULONG  Height      = 0, 
-               Width       = 0, 
-               RefreshRate = 0, 
-               PxlClk      = 0;
-        BOOL32 Interlaced  = 0;
+        ULONG  height      = 0, 
+               width       = 0, 
+               refreshRate = 0, 
+               pxlClk      = 0;
+        BOOL32 interlaced  = 0;
 
         VHD_DV_CS InputCS{};
-        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH ,         &Width);
-        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT,         &Height);
-        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , (ULONG*)&Interlaced);
-        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE ,         &RefreshRate);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH ,         &width);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT,         &height);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , (ULONG*)&interlaced);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE ,         &refreshRate);
         VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , (ULONG*)&InputCS);
-        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  ,         &PxlClk);
+        VHD_GetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  ,         &pxlClk);
         /* Configure stream.*/
-        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH , Width);
-        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT, Height);
-        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , Interlaced);
-        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE , RefreshRate);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_WIDTH , width);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_ACTIVE_HEIGHT, height);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INTERLACED   , interlaced);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_REFRESH_RATE , refreshRate);
         VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_INPUT_CS     , InputCS);
-        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  , PxlClk);
+        VHD_SetStreamProperty(streamHdl->getHandle(), VHD_DV_SP_PIXEL_CLOCK  , pxlClk);
     }
     else
-        throw std::runtime_error("ERROR : Cannot detect if incoming mode is HDMI.");
+        throw modFatalErr("Delta Cast error :  Cannot detect if incoming mode is HDMI.");
 }
 inline void deltaCast::startStream       ()
 {
@@ -286,7 +317,7 @@ inline void deltaCast::startStream       ()
     while (true)
     {
         /* Try to lock next slot */
-        auto Result { VHD_LockSlotHandle(streamHdl->getHandle(), &slotHandle) };
+        auto Result = VHD_LockSlotHandle(streamHdl->getHandle(), &slotHandle);
         if (Result == VHDERR_NOERROR)
         {
             VHD_DV_AUDIO_TYPE HDMIAudioType{};
@@ -314,7 +345,7 @@ inline void deltaCast::startStream       ()
             VHD_UnlockSlotHandle(slotHandle);
         }
         else if (Result != VHDERR_TIMEOUT)
-            throw std::runtime_error("ERROR : Cannot lock slot on RX0 stream.");
+            throw modFatalErr("Delta Cast error :  Cannot lock slot on RX0 stream.");
     }
 }
 inline auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,

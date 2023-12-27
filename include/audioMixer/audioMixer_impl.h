@@ -36,6 +36,8 @@ class audioMixer
 	//input modules init function
 	template<inputMod_t U>
 	void inputModInit();
+	template<inputMod_t U>
+	void inputModRestart();
 public:
     audioMixer(const outputParameter& outputCfg);
 	void startStream();
@@ -45,18 +47,32 @@ public:
 template<inputMod_t U>
 inline void audioMixer::inputModInit	  ()																
 {
-	auto typeName(typeid(U).name());
-	if (!inputModules.contains(typeName))
+	try
 	{
-		inputModules.insert(std::make_pair <std::string, std::unique_ptr <U>>
-										   (typeName   , std::make_unique<U>(outputConfig)));
+		auto typeName(typeid(U).name());
+		if (!inputModules.contains(typeName))
+		{
+			inputModules.insert(std::make_pair <std::string, std::unique_ptr <U>>
+				(typeName, std::make_unique<U>(outputConfig)));
 
-		std::print("{} module is enabled.\n", typeName);
+			std::print("{} module is enabled.\n", typeName);
+		}
+		else
+			std::print("Module already exist, please try another option.\n");
 	}
-	else
-		std::print("Module already exist, please try another option.\n");
+	catch (const modFatalErr& fatalErr)
+	{
+		std::print("{}\n", fatalErr.what());
+		std::print("Module is not enabled.\n");
+	}
 }
-			audioMixer::audioMixer		  (const outputParameter& outputCfg)
+template<inputMod_t U>
+inline void audioMixer::inputModRestart()
+{
+	inputModules[typeName(typeid(U).name())]->stop();
+	inputModules[typeName(typeid(U).name())]->start();
+}
+audioMixer::audioMixer		  (const outputParameter& outputCfg)
 	: outputConfig(outputCfg)
 {
 	/*Module select*/
