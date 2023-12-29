@@ -102,7 +102,7 @@ public:
 					if (codecParam->codec_type == AVMEDIA_TYPE_AUDIO)
 					{
 						auto audioStream = fmtCtx->streams[i];
-
+						std::print("index : {}\n", audioStream->index);
 						auto codec = avcodec_find_decoder(codecParam->codec_id);
 
 						auto codecCtx = avcodec_alloc_context3(codec);
