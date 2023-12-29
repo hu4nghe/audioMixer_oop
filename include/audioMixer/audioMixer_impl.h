@@ -36,8 +36,6 @@ class audioMixer
 	//input modules init function
 	template<inputMod_t U>
 	void inputModInit();
-	template<inputMod_t U>
-	void inputModRestart();
 public:
     audioMixer(const outputParameter& outputCfg);
 	void startStream();
@@ -65,12 +63,6 @@ inline void audioMixer::inputModInit	  ()
 		std::print("{}\n", fatalErr.what());
 		std::print("Module is not enabled.\n");
 	}
-}
-template<inputMod_t U>
-inline void audioMixer::inputModRestart()
-{
-	inputModules[typeName(typeid(U).name())]->stop();
-	inputModules[typeName(typeid(U).name())]->start();
 }
 audioMixer::audioMixer		  (const outputParameter& outputCfg)
 	: outputConfig(outputCfg)
@@ -123,17 +115,18 @@ audioMixer::audioMixer		  (const outputParameter& outputCfg)
 inline void audioMixer::startStream		  ()								
 {
 	std::vector<std::jthread> threads;
-	threads.emplace_back(&audioMixer::PaStart, this);
-	for (auto& [key, instance] : inputModules)
+	threads.reserve(inputModules.size() + 1);
+	threads.emplace_back(&audioMixer::PaStart, this);//start portaudio thread
+	for (auto& [key, instance] : inputModules)//start input modules threads
 		threads.emplace_back([&instance]() { instance->start(); });
 }
 inline	int audioMixer::PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData)
 {
 	return static_cast<audioMixer*>(userData)->PaOutCallback(inputBuffer,
-		outputBuffer,
-		framesPerBuffer,
-		timeInfo,
-		statusFlags);
+														     outputBuffer,
+														     framesPerBuffer,
+															 timeInfo,
+														     statusFlags);
 }
 inline  int audioMixer::PaOutCallback	  (PA_CALLBACK_PARAM_LIST)
 {

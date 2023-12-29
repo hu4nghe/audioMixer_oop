@@ -2,9 +2,18 @@
 #define AUDIOMIXER_FILE_H
 
 #include "sndfile.hh"
+extern "C"
+{
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
+}
 
+#include <algorithm>
+#include <execution>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 
 #include "audioMixer_base.h"
 
@@ -13,46 +22,20 @@ namespace fs = std::filesystem;
 class soundFile : public module
 {
 	/*Sound file path*/
-	std::vector<fs::path> pathList;
-	
-	void selectFile();
-	void readFile  ();
-
+	std::vector<fs::path> soundList;
+	std::vector<fs::path> videoList;
 public:
-	soundFile(const outputParameter& outputCfg);		
-
-	void start() override;
-	void stop () override;
-};
-
-#pragma region IMPL
-	 soundFile::soundFile (const outputParameter& outputCfg)
-	:	module(outputCfg) {}
-void soundFile::start	  ()
-{
-	std::print("file Module is activated.\n");
-	active = true;
-	this->selectFile();
-	this->readFile  ();
-	while(!this->audio->empty()){}
-}
-void soundFile::stop	  ()
-{
-	std::print("file Module is stopped.\n");
-	active = false;
-}
-void soundFile::selectFile()
-{
-	try
+	soundFile(const outputParameter& outputCfg) : module(outputCfg) {}
+	void selectFile()
 	{
-		std::print("Please enter the path of the sound file, enter end to confirm.\n");
+		std::print("Please enter the path of the sound file.\nE(nd)\n");
 		std::string filePathStr;
 		do
 		{
 			std::getline(std::cin >> std::ws, filePathStr);
-			if (filePathStr == "end")
+			if (filePathStr == "E" || filePathStr == "e")
 			{
-				std::print("Sound files confimed.\n");
+				std::print("File path confimed.\n");
 				break;
 			}
 			else
@@ -60,52 +43,125 @@ void soundFile::selectFile()
 				fs::path filePath(filePathStr);
 				if (fs::exists(filePath))
 				{
-					std::print("Sound file seletcted : {}.\n", filePath.filename().string());
-					pathList.push_back(filePath);
+					const auto extension = filePath.extension();
+					if (extension == ".wav")
+						soundList.push_back(filePath);
+					else if (extension == ".mov" || extension == ".mp4")
+						videoList.push_back(filePath);
+					else
+					{
+						std::print("Format not supported.");
+						continue;
+					}
+					std::print("File seletcted : \n{}.\n", filePath.filename().string());
 				}
 				else
-					throw modObjNotFound("Error : No such file or dictory.");
+					std::print("No such file or dictory.\n");
 			}
 		} while (true);
 	}
-	catch (const modObjNotFound& err)
+	
+	void readSoundFiles()
 	{
-		std::print("sndfile error : {}.\n", err.what());
+		std::for_each(
+			std::execution::par,
+			soundList.begin(),
+			soundList.end(), 
+			[this](const fs::path& sndFilePath) 
+			{
+				SndfileHandle sndFile(sndFilePath.string());
+				const std::size_t bufferSize = sndFile.frames() * sndFile.channels() + 10;
+				float* temp = new float[bufferSize];
+				sndFile.read(temp, bufferSize);
+
+				outputConfig.queueCapacity = bufferSize;
+				audioQueue<float> sndQueue(outputConfig);
+				std::vector<float> audioData(temp, temp + bufferSize);
+
+				sndQueue.push(audioData, sndFile.samplerate(), sndFile.channels());
+				delete[] temp;
+
+				audio->push_back(std::move(sndQueue));
+			});
+	}
+	
+	void readVideoFiles()
+	{
+		std::for_each(
+			std::execution::par,
+			videoList.begin(),
+			videoList.end(),
+			[this](const fs::path& videoFilePath)
+			{
+				auto fmtCtx = avformat_alloc_context();
+				avformat_open_input(&fmtCtx, videoFilePath.string().c_str(), nullptr, nullptr);
+				avformat_find_stream_info(fmtCtx,nullptr);
+				for (auto i = 0; i < fmtCtx->nb_streams;i++)
+				{
+					auto codecParam = fmtCtx->streams[i]->codecpar;
+					if (codecParam->codec_type == AVMEDIA_TYPE_AUDIO)
+					{
+						auto audioStream = fmtCtx->streams[i];
+
+						auto codec = avcodec_find_decoder(codecParam->codec_id);
+
+						auto codecCtx = avcodec_alloc_context3(codec);
+						avcodec_parameters_to_context(codecCtx, codecParam);
+						avcodec_open2(codecCtx, codec, nullptr);
+
+						auto packet = av_packet_alloc();
+						auto frame = av_frame_alloc();
+						while (av_read_frame(fmtCtx, packet))
+						{
+							avcodec_send_packet(codecCtx, packet);
+							avcodec_receive_frame(codecCtx, frame);
+
+						}
+					}
+
+				}
+
+				
+			});
+	}
+	void start() override
+	{
+		std::print("file Module is activated.\n");
+		active = true;
+		soundList.clear();
+		videoList.clear();
+		selectFile();
+		readSoundFiles();
+		readVideoFiles();
+		bool stop = false;
+		while (!stop) 
+		{
+			stop = true;
+			for (const auto& queue : *audio)
+				if (!queue.empty())
+					stop = false;
+		}
 		std::print("Press any key to try again.\n");
 		std::cin.ignore();
-		this->selectFile();
+		start();
 	}
-	catch (const modFatalErr& err)
+	void stop () override
 	{
-		std::print("libsndfile fatal error : {}\n", err.what());
-		throw err;
+		std::print("file Module is stopped.\n");
+		active = false;
 	}
-}
-void soundFile::readFile  ()
-{
-	std::vector<SndfileHandle> fileHandleList;
-	for (auto& i : pathList)
-	{
-		SndfileHandle sndFile(i.string());
-		fileHandleList.push_back(sndFile);
-	}
-	for (auto& i : fileHandleList)
-	{
-		const std::size_t bufferSize = i.frames() * i.channels() + 100;
-		float* temp = new float[bufferSize];
-		i.read(temp, bufferSize);
+};
 
-		outputConfig.queueCapacity = bufferSize;
-		audioQueue<float> sndQueue(outputConfig);
-		std::vector<float> audioData(temp, temp + bufferSize);
-
-		sndQueue.push(audioData, i.samplerate(), i.channels());
-		delete[] temp;
-
-		audio->push_back(std::move(sndQueue));
-	}
-	return;
-}
-#pragma endregion
-//IMPL soundFile
 #endif//AUDIOMIXER_FILE_H
+/*
+catch (const modObjNotFound& err)
+{
+	std::print("File module error : {}.\n", err.what());
+	std::print("Press any key to try again.\n");
+	std::cin.ignore();
+}
+catch (const modFatalErr& err)
+{
+	std::print("File module fatal error : {}\n", err.what());
+	throw err;
+}*/

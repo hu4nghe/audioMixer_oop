@@ -57,12 +57,14 @@ int main()
 	auto config = configuration();
 	audioMixer m1(config);
 	m1.startStream();
-
-	/*outputParameter outCfg;
-
-	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau dossier\\Music\\MKV5.mov");
-	QTFF fileA(filepath,outCfg);
-	fileA.start();*/
+	/*
+	
+	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau_dossier\\Music\\N31.mp4");
+	QTFF fileA(filepath, config);
+	fileA.searchAudioInfo();*/
+	/*
+	soundFile modfile(config);
+	modfile.selectFile();*/
 
 	return 0;
 }

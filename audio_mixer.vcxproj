@@ -76,6 +76,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)bin</OutDir>
+    <ExternalIncludePath>$(SolutionDir)include\ffmpeg;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -116,7 +117,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)lib\portaudio\portaudio_x64.lib;$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Audio.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_VbiData.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)lib\portaudio\portaudio_x64.lib;$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Audio.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_VbiData.lib;$(SolutionDir)lib\ffmpeg\avcodec.lib;$(SolutionDir)lib\ffmpeg\avdevice.lib;$(SolutionDir)lib\ffmpeg\avfilter.lib;$(SolutionDir)lib\ffmpeg\avformat.lib;$(SolutionDir)lib\ffmpeg\avutil.lib;$(SolutionDir)lib\ffmpeg\swresample.lib;$(SolutionDir)lib\ffmpeg\swscale.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Lib>
       <AdditionalDependencies>$(SolutionDir)lib\NDI\Processing.NDI.Lib.x64.lib;$(SolutionDir)lib\libsndfile\sndfile.lib;$(SolutionDir)lib\libsamplerate\samplerate.lib;$(SolutionDir)lib\portaudio\portaudio_x64.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Audio.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_Vbi.lib;$(SolutionDir)lib\DeltaCast\VideoMasterHD_VbiData.lib;%(AdditionalDependencies)</AdditionalDependencies>
