@@ -54,17 +54,21 @@ static bool is_big_endian(void)
 
 int main()
 {
-	auto config = configuration();
-	audioMixer m1(config);
-	m1.startStream();
-	/*
 	
-	std::string filepath("C:\\Users\\Modulo\\Desktop\\Nouveau_dossier\\Music\\N31.mp4");
-	QTFF fileA(filepath, config);
-	fileA.searchAudioInfo();*/
+	auto config = configuration();
+
+	/* audioMixer test*/
 	/*
-	soundFile modfile(config);
-	modfile.selectFile();*/
+	audioMixer mixer(config);
+	mixer.startStream();
+	*/
+	
+	/*QTFF file parser test*/
+	/*
+	* auto path = "C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov";
+	QTFF parser(filepath, config);
+	parser.searchAudioInfo();
+	*/
 
 	return 0;
 }

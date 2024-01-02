@@ -95,33 +95,54 @@ public:
 			{
 				auto fmtCtx = avformat_alloc_context();
 				avformat_open_input(&fmtCtx, videoFilePath.string().c_str(), nullptr, nullptr);
-				avformat_find_stream_info(fmtCtx,nullptr);
-				for (auto i = 0; i < fmtCtx->nb_streams;i++)
+				avformat_find_stream_info(fmtCtx, nullptr);
+				for (auto i = 0; i < fmtCtx->nb_streams; i++)
 				{
 					auto codecParam = fmtCtx->streams[i]->codecpar;
 					if (codecParam->codec_type == AVMEDIA_TYPE_AUDIO)
 					{
 						auto audioStream = fmtCtx->streams[i];
 						std::print("index : {}\n", audioStream->index);
+
+
 						auto codec = avcodec_find_decoder(codecParam->codec_id);
 
 						auto codecCtx = avcodec_alloc_context3(codec);
 						avcodec_parameters_to_context(codecCtx, codecParam);
+
 						avcodec_open2(codecCtx, codec, nullptr);
+						std::print("channels : {}\n", codec->long_name);
+
 
 						auto packet = av_packet_alloc();
 						auto frame = av_frame_alloc();
-						while (av_read_frame(fmtCtx, packet))
+
+						auto ret = avcodec_send_packet(codecCtx, packet);
+						
+						std::vector<uint8_t> dataVector;
+						while (ret >= 0)
 						{
-							avcodec_send_packet(codecCtx, packet);
-							avcodec_receive_frame(codecCtx, frame);
+							ret = avcodec_receive_frame(codecCtx, frame);
+							auto data_size = av_get_bytes_per_sample(codecCtx->sample_fmt);
+							std::print("data size : {}\n", data_size);
+							
+							for (int i = 0; i < frame->nb_samples; i++)
+							{
+								for(int ch = 0; ch < codecCtx->ch_layout.nb_channels;ch++)
+								{
+									uint8_t* data_start = frame->data[ch] + data_size * i;
+									dataVector.insert(dataVector.end(), data_start, data_start + data_size);
+								}
+							}
+
 
 						}
+						std::print("packet all sent, data vector size : {}\n",dataVector.size());
 					}
 
 				}
 
-				
+				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
 			});
 	}
 	void start() override

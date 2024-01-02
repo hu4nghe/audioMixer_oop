@@ -3,18 +3,23 @@
 
 #include <atomic>
 #include <concepts>
+#include <cstdint>
 #include <vector>
 
 #include "samplerate.h"
 
 #pragma region Output parameters class
 
-/*default values*/
-constexpr std::size_t defaultSampleRate = 48000;
-constexpr std::size_t defaultChannelNum = 2;
-constexpr std::size_t defaultBufferSize = 480000;
-constexpr std::size_t defaultMinBuffer  = 0;
-
+    constexpr std::size_t defaultSampleRate = 48000;
+    constexpr std::size_t defaultChannelNum = 2;
+    constexpr std::size_t defaultBufferSize = 480000;//10 seconds
+    constexpr std::size_t defaultMinBuffer  = 0;
+    
+/**
+ * @brief a struct that declares :
+ *  - audio ouput configuration parameters.
+ *  - max and min buffer size for audio mixer.
+ */
 struct outputParameter
 {
     std:: size_t sampleRate;
@@ -35,12 +40,15 @@ struct outputParameter
 
 /**
  * @brief audio sample data type.
- *
  * @tparam T audio data type : 32bit float[-1;1], 16bit short[-32768;32767].
  */
 template<typename T>
 concept audio_t = std::same_as<T, std::int16_t> || std::same_as<T, float>;
 
+/**
+ * @brief Lock-free queue for PCM audio data 
+ * (resampling input audio to output sample rate by : libsamplerate.)
+ */
 template <audio_t T>
 class audioQueue 
 {
@@ -146,9 +154,9 @@ audioQueue<T>::audioQueue(audioQueue<T>&& other) noexcept
 /**
  * @brief enqueue operation, push a value into the audio queue.
  * 
- * use release - aquire model to ensure a sychornized-with relation between differnt therad.
+ * use release - aquire model to ensure a sychornized-with relation between differnt therads.
  * 
- * @param value  Value to push.
+ * @param  value Value to push.
  * @return true  If operation successed.
  * @return false If operation failed.
  */
@@ -217,6 +225,7 @@ void audioQueue<T>::resample(      std::vector<T>& data,
 
     std::vector<float> floatData;
 
+    //maping 16 bit short data to 32 bit float for resampling.
     if (std::is_same<T, short>::value)
     {
         floatData.resize(data.size());
@@ -225,6 +234,7 @@ void audioQueue<T>::resample(      std::vector<T>& data,
     else
         floatData = std::move(data);
 
+    //resampling using libsamplerate.
     std::vector<float> temp(newSize);//new vector for resampling output.
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, static_cast<int>(inputChannelNumber), nullptr);
 
@@ -269,7 +279,7 @@ void audioQueue<T>::channelConvert(      std::vector<T>& data,
 
     data = std::move(convertedData);
 }
-#pragma endregion
+#pragma endregion //Private member functions
 
 #pragma region Public API
 /**
@@ -344,6 +354,6 @@ void audioQueue<T>::setCapacity(const std::size_t newCapacity)
         outConfig.queueCapacity = newCapacity;
     }
 }
-#pragma endregion
-#pragma endregion
+#pragma endregion //Public API
+#pragma endregion //IMPL 
 #endif// AUDIO_QUEUE_H

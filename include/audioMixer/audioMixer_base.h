@@ -1,7 +1,6 @@
 #ifndef AUDIOMIXER_BASE_H
 #define AUDIOMIXER_BASE_H
 
-#include <cstdint>
 #include <exception>
 #include <functional>
 #include <memory>
@@ -19,12 +18,22 @@ using sPtrQueueList = std::shared_ptr<std::vector<audioQueue<T>>>;
 
 
 /* Exceptions */
+/**
+ * @brief Audio mixer module fatal error
+ * Module will therminate immediatly 
+ * Audio data will be lost
+ * 
+ */
 class modFatalErr : public std::runtime_error
 {
 public:
     modFatalErr(const char* msg) : std::runtime_error(msg) {}
     const char* what() const noexcept override { return std::runtime_error::what(); }
 };
+/**
+ * @brief Object not found error
+ * File or audio source not exist. 
+ */
 class modObjNotFound : public std::logic_error
 {
 public:
@@ -32,17 +41,9 @@ public:
     const char* what() const noexcept override { return std::logic_error::what(); }
 };
 
-/* tool functions */
-template<typename T>
-void parallelForEach(const std::vector<T>&                data, 
-                     const std::function<void(const T&)>& func) 
-{
-    std::vector<std::jthread> threads;
-    for (const auto& elem : data)
-        threads.emplace_back([elem, &func](){ func(elem); });
-}
-
-/* input module base class */
+/**
+ * @brief Audio mixer input module base class
+ */
 class audioMixerModule_base
 {
 protected:
@@ -67,6 +68,11 @@ public:
     [[nodiscard]] auto getAudio() const { return audio ; }
     [[nodiscard]] bool isActive() const { return active; }
 };
+/**
+ * @brief Audio mixer input module type
+ * 
+ * @tparam U name of input module
+ */
 template<typename U>
 concept inputMod_t = std::is_base_of<audioMixerModule_base, U>::value;
 using module = audioMixerModule_base;

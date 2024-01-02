@@ -114,8 +114,17 @@ public:
 };
 
 #pragma region IMPL NDI
+/**
+ * @brief Initialize NDI input module.
+ * 
+ * @param outputCfg ouput parameters 
+ */
 	 NDI::NDI	   (const outputParameter& outputCfg)
 	:	module(outputCfg) {}
+
+/**
+ * @brief Start NDI input module.
+ */
 void NDI::start	   ()
 {
 	NDIlib_initialize();
@@ -148,12 +157,18 @@ void NDI::start	   ()
 		start();
 	}
 }
+/**
+ * @brief Stop NDI input module.
+ */
 void NDI::stop	   ()
 {
 	NDIlib_destroy();
 	std::print("NDI Module is stopped.\n");
 	active = false;
 }
+/**
+ * @brief Search all NDI source available. 
+ */
 void NDI::srcSearch()
 {
 	try
@@ -162,13 +177,13 @@ void NDI::srcSearch()
 			throw modFatalErr("NDI lib is not running !");
 
 		NDIFinder audioFinder{};
-		auto sourcesFound{ audioFinder.findSrc(NDI_TIMEOUT) };
+		auto sourcesFound = audioFinder.findSrc(NDI_TIMEOUT);
 
 		//print all sources found
 		std::print("NDI sources :\n");
 		for (auto& i : sourcesFound)
 			std::print("Name : {}	\nIP   : {}\n\n",
-				i.p_ndi_name, i.p_url_address);
+				        i.p_ndi_name, i.p_url_address);
 
 		//let user select NDI sources that they want.
 		bool sourceMatched = false;
@@ -216,6 +231,9 @@ void NDI::srcSearch()
 		this->srcSearch();
 	}
 }
+/**
+ * @brief Receive audio from all NDI source selected.
+ */
 void NDI::recvAudio()
 {
 	while (true)
