@@ -70,7 +70,7 @@ public:
 			[this](const fs::path& sndFilePath) 
 			{
 				SndfileHandle sndFile(sndFilePath.string());
-				const std::size_t bufferSize = sndFile.frames() * sndFile.channels() + 10;
+				const std::size_t bufferSize = sndFile.frames() * sndFile.channels();
 				float* temp = new float[bufferSize];
 				sndFile.read(temp, bufferSize);
 
@@ -107,51 +107,47 @@ public:
 					if (codecParam->codec_type == AVMEDIA_TYPE_AUDIO)
 					{
 						auto audioStream = fmtCtx->streams[i];
-						auto fileSampleRate = codecParam->sample_rate;
-						auto fileNbChannels = codecParam->ch_layout.nb_channels;
-						std::print("Channel : {}\nSample rate : {}\n",fileNbChannels, fileSampleRate);
-
-						auto codec = avcodec_find_decoder(codecParam->codec_id);
-						auto codecCtx = avcodec_alloc_context3(codec);
+						auto codec		 = avcodec_find_decoder(codecParam->codec_id);
+						auto codecCtx	 = avcodec_alloc_context3(codec);
 						avcodec_parameters_to_context(codecCtx, codecParam);
 						avcodec_open2(codecCtx, codec, nullptr); 
 
+						
+						std::vector<std::uint8_t> byteData;
+						int sampleRate  = 0;
+						int nbChannels  = 0;
+						int audioFormat = 0;
+
 						auto packet = av_packet_alloc();
-						std::vector<std::uint8_t> dataVector;
 						while (av_read_frame(fmtCtx, packet) >= 0)
 						{
 							if (packet->stream_index == audioStream->index)
 							{
-								
 								auto frame = av_frame_alloc();
 								auto ret = avcodec_send_packet(codecCtx, packet);
 
 								while (ret >= 0)
 								{
 									ret = avcodec_receive_frame(codecCtx, frame);
-
 									auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
-									auto fmt = frame->format;
-									auto sampleRate = frame->sample_rate;
-									auto nbChannel = frame->ch_layout.nb_channels;
-									std::print("sample size : {}\nsample rate : {}\nchannels : {}\nformat : {}\n////////////////////\n", 
-												sampleSize,sampleRate,nbChannel,fmt);
-									
+
+									audioFormat = frame->format;
+									sampleRate  = frame->sample_rate;
+									nbChannels  = frame->ch_layout.nb_channels;
 									
 									for (int i = 0; i < frame->nb_samples; i++)
 									{
 										for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
 										{
 											std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
-											dataVector.insert(dataVector.end(), data_start, data_start + sampleSize);
+											byteData.insert(byteData.end(), data_start, data_start + sampleSize);
 										}
 									}
 								}
-								
 							}
 						}
-						std::size_t floatSize = dataVector.size() / 4;
-						float* floatData = reinterpret_cast<float*>(dataVector.data());
+						std::size_t floatSize = byteData.size() / 4;
+						float* floatData = reinterpret_cast<float*>(byteData.data());
 						std::vector<float> floatVec(floatData, floatData + floatSize);
 
 						auto videoFileConfig = outputConfig;
