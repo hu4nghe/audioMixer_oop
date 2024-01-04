@@ -188,6 +188,7 @@ template<audio_t T>
 bool audioQueue<T>::dequeue(         T& value, 
                             const bool  mode)
 {
+    if (queue.size() == 0) return false;
     auto currHead = head.load(std::memory_order_relaxed);
     auto nextHead = (currHead + 1) % queue.size();
     if (currHead == tail.load(std::memory_order_acquire)) 

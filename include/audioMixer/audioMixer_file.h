@@ -74,74 +74,94 @@ public:
 				float* temp = new float[bufferSize];
 				sndFile.read(temp, bufferSize);
 
-				outputConfig.queueCapacity = bufferSize;
-				audioQueue<float> sndQueue(outputConfig);
+				auto soundFileConfig = outputConfig;
+				soundFileConfig.queueCapacity = bufferSize;
+				audioQueue<float> soundFileQueue(soundFileConfig);
 				std::vector<float> audioData(temp, temp + bufferSize);
 
-				sndQueue.push(audioData, sndFile.samplerate(), sndFile.channels());
+				soundFileQueue.push(audioData, sndFile.samplerate(), sndFile.channels());
 				delete[] temp;
 
-				audio->push_back(std::move(sndQueue));
+				audio->push_back(std::move(soundFileQueue));
 			});
 	}
 	
 	void readVideoFiles()
 	{
+		
 		std::for_each(
 			std::execution::par,
 			videoList.begin(),
 			videoList.end(),
 			[this](const fs::path& videoFilePath)
 			{
+				//open file and retrieve stream infos
 				auto fmtCtx = avformat_alloc_context();
 				avformat_open_input(&fmtCtx, videoFilePath.string().c_str(), nullptr, nullptr);
 				avformat_find_stream_info(fmtCtx, nullptr);
+
+				//for all stream found
 				for (auto i = 0; i < fmtCtx->nb_streams; i++)
 				{
 					auto codecParam = fmtCtx->streams[i]->codecpar;
 					if (codecParam->codec_type == AVMEDIA_TYPE_AUDIO)
 					{
 						auto audioStream = fmtCtx->streams[i];
-						std::print("index : {}\n", audioStream->index);
-
+						auto fileSampleRate = codecParam->sample_rate;
+						auto fileNbChannels = codecParam->ch_layout.nb_channels;
+						std::print("Channel : {}\nSample rate : {}\n",fileNbChannels, fileSampleRate);
 
 						auto codec = avcodec_find_decoder(codecParam->codec_id);
-
 						auto codecCtx = avcodec_alloc_context3(codec);
 						avcodec_parameters_to_context(codecCtx, codecParam);
-
-						avcodec_open2(codecCtx, codec, nullptr);
-						std::print("channels : {}\n", codec->long_name);
-
+						avcodec_open2(codecCtx, codec, nullptr); 
 
 						auto packet = av_packet_alloc();
-						auto frame = av_frame_alloc();
-
-						auto ret = avcodec_send_packet(codecCtx, packet);
-						
-						std::vector<uint8_t> dataVector;
-						while (ret >= 0)
+						std::vector<std::uint8_t> dataVector;
+						while (av_read_frame(fmtCtx, packet) >= 0)
 						{
-							ret = avcodec_receive_frame(codecCtx, frame);
-							auto data_size = av_get_bytes_per_sample(codecCtx->sample_fmt);
-							std::print("data size : {}\n", data_size);
-							
-							for (int i = 0; i < frame->nb_samples; i++)
+							if (packet->stream_index == audioStream->index)
 							{
-								for(int ch = 0; ch < codecCtx->ch_layout.nb_channels;ch++)
+								
+								auto frame = av_frame_alloc();
+								auto ret = avcodec_send_packet(codecCtx, packet);
+
+								while (ret >= 0)
 								{
-									uint8_t* data_start = frame->data[ch] + data_size * i;
-									dataVector.insert(dataVector.end(), data_start, data_start + data_size);
+									ret = avcodec_receive_frame(codecCtx, frame);
+
+									auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
+									auto fmt = frame->format;
+									auto sampleRate = frame->sample_rate;
+									auto nbChannel = frame->ch_layout.nb_channels;
+									std::print("sample size : {}\nsample rate : {}\nchannels : {}\nformat : {}\n////////////////////\n", 
+												sampleSize,sampleRate,nbChannel,fmt);
+									if (fmt == -1)
+										continue;
+									
+									for (int i = 0; i < frame->nb_samples; i++)
+									{
+										for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
+										{
+											std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
+											dataVector.insert(dataVector.end(), data_start, data_start + sampleSize);
+										}
+									}
 								}
+								
 							}
-
-
 						}
-						std::print("packet all sent, data vector size : {}\n",dataVector.size());
+						std::size_t floatSize = dataVector.size() / 4;
+						float* floatData = reinterpret_cast<float*>(dataVector.data());
+						std::vector<float> floatVec(floatData, floatData + floatSize);
+
+						auto videoFileConfig = outputConfig;
+						videoFileConfig.queueCapacity = floatSize;
+						audioQueue<float> videoFileQueue(videoFileConfig);
+						videoFileQueue.push(floatVec, 44100, 2);
+						audio->push_back(std::move(videoFileQueue));
 					}
-
 				}
-
 				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
 			});
 	}
@@ -174,15 +194,41 @@ public:
 };
 
 #endif//AUDIOMIXER_FILE_H
+
 /*
-catch (const modObjNotFound& err)
+static void decode(AVCodecContext* dec_ctx, AVPacket* pkt, AVFrame* frame, std::vector<uint8_t>& audioSamples)
 {
-	std::print("File module error : {}.\n", err.what());
-	std::print("Press any key to try again.\n");
-	std::cin.ignore();
-}
-catch (const modFatalErr& err)
-{
-	std::print("File module fatal error : {}\n", err.what());
-	throw err;
+	int i, ch;
+	int ret, data_size;
+
+	//send the packet with the compressed data to the decoder 
+	ret = avcodec_send_packet(dec_ctx, pkt);
+	if (ret < 0)
+	{
+		fprintf(stderr, "Error submitting the packet to the decoder\n");
+		exit(1);
+	}
+
+	//read all the output frames (in general there may be any number of them 
+	while (ret >= 0)
+	{
+		ret = avcodec_receive_frame(dec_ctx, frame);
+		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+			return;
+		else if (ret < 0)
+		{
+			fprintf(stderr, "Error during decoding\n");
+			exit(1);
+		}
+		data_size = av_get_bytes_per_sample(dec_ctx->sample_fmt);
+		if (data_size < 0)
+		{
+			//This should not occur, checking just for paranoia
+			fprintf(stderr, "Failed to calculate data size\n");
+			exit(1);
+		}
+		for (i = 0; i < frame->nb_samples; i++)
+			for (ch = 0; ch < dec_ctx->channels; ch++)
+				audioSamples.push_back(frame->data[ch][data_size * i]);
+	}
 }*/

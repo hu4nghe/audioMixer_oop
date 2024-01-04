@@ -58,17 +58,19 @@ int main()
 	auto config = configuration();
 
 	/* audioMixer test*/
-	/*
+	
 	audioMixer mixer(config);
 	mixer.startStream();
-	*/
+	
 	
 	/*QTFF file parser test*/
 	/*
 	* auto path = "C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov";
 	QTFF parser(filepath, config);
 	parser.searchAudioInfo();
-	*/
+	
+	soundFile file(config);
+	file.start();*/
 
 	return 0;
 }
