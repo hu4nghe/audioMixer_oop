@@ -36,12 +36,6 @@
     <ClInclude Include="include\audioMixer\audioMixer_DeltaCast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\audioMixer\audioMixer_QTFF_Parser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\audioMixer\audioMixer_QTFF_Struct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="libaudiomier_testapp.cpp">

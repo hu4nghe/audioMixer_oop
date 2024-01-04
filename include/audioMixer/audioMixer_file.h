@@ -136,8 +136,7 @@ public:
 									auto nbChannel = frame->ch_layout.nb_channels;
 									std::print("sample size : {}\nsample rate : {}\nchannels : {}\nformat : {}\n////////////////////\n", 
 												sampleSize,sampleRate,nbChannel,fmt);
-									if (fmt == -1)
-										continue;
+									
 									
 									for (int i = 0; i < frame->nb_samples; i++)
 									{
