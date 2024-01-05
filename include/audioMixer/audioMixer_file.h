@@ -95,6 +95,10 @@ public:
 			videoList.end(),
 			[this](const fs::path& videoFilePath)
 			{
+				//create a queue for each file
+				audioQueue<float> videoFloatQueue(outputConfig);
+				audio->push_back(videoFloatQueue);
+
 				//open file and retrieve stream infos
 				auto fmtCtx = avformat_alloc_context();
 				avformat_open_input(&fmtCtx, videoFilePath.string().c_str(), nullptr, nullptr);
@@ -111,7 +115,6 @@ public:
 						auto codecCtx	 = avcodec_alloc_context3(codec);
 						avcodec_parameters_to_context(codecCtx, codecParam);
 						avcodec_open2(codecCtx, codec, nullptr); 
-
 						
 						std::vector<std::uint8_t> byteData;
 						int sampleRate  = 0;
@@ -141,20 +144,18 @@ public:
 										{
 											std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
 											byteData.insert(byteData.end(), data_start, data_start + sampleSize);
+											
 										}
 									}
 								}
+								std::size_t floatSize = byteData.size() / 4;
+								float* floatData = reinterpret_cast<float*>(byteData.data());
+								std::vector<float> floatVec(floatData, floatData + floatSize);
+								(*audio).back().push(floatVec, 44100, 2);
+								byteData.clear();
+								std::print("current audio data count : {}\n", (*audio).back().size());
 							}
 						}
-						std::size_t floatSize = byteData.size() / 4;
-						float* floatData = reinterpret_cast<float*>(byteData.data());
-						std::vector<float> floatVec(floatData, floatData + floatSize);
-
-						auto videoFileConfig = outputConfig;
-						videoFileConfig.queueCapacity = floatSize;
-						audioQueue<float> videoFileQueue(videoFileConfig);
-						videoFileQueue.push(floatVec, 44100, 2);
-						audio->push_back(std::move(videoFileQueue));
 					}
 				}
 				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
