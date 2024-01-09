@@ -90,8 +90,8 @@ public:
 			else 
 				NDIlib_util_audio_to_interleaved_16s_v2(&audioInput, &audioFrame);
 
-			std::vector<T> audioVec(audioFrame.p_data, audioFrame.p_data + dataSize);
-			audio.push(audioVec,
+			
+			audio.push(std::vector<T>(audioFrame.p_data, audioFrame.p_data + dataSize),
 					   audioFrame.sample_rate, 
 					   audioFrame.no_channels);
 

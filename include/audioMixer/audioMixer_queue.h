@@ -64,7 +64,7 @@ public :
     audioQueue(       outputParameter outputConfig);
     audioQueue(const  audioQueue<T>&  other);
     audioQueue(       audioQueue<T>&& other) noexcept;
-    bool push (      std::vector<T>&  data,
+    bool push (      std::vector<T>&& data,
                const std::uint32_t    inputSampleRate,
                const std:: uint8_t    inputChannelNumber);
     bool pop  (                  T*&  data,
@@ -293,15 +293,13 @@ void audioQueue<T>::channelConvert(      std::vector<T>& data,
  * @return false              If operation failed due to no enough space.
  */
 template<audio_t T>
-bool audioQueue<T>::push(      std::vector<T>&  data,
+bool audioQueue<T>::push(      std::vector<T>&& data,
                          const std::uint32_t    inputSampleRate,
                          const std:: uint8_t    inputChannelNumber)
 {
     if (data.size() + count.load() > outConfig.queueCapacity)
-    {
-        std::print("data size :{}   current count : {}  capacity : {}\n", data.size() , count.load() , outConfig.queueCapacity);
         return false;
-    }
+    
     if (inputSampleRate != outConfig.sampleRate)
         resample(data, inputSampleRate, inputChannelNumber);
     if (inputChannelNumber != outConfig.channelNumber)

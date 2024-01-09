@@ -2,6 +2,8 @@
 #define AUDIOMIXER_FILE_H
 
 #include "sndfile.hh"
+
+//ffmpeg headers
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -18,27 +20,6 @@ extern "C"
 #include "audioMixer_base.h"
 
 namespace fs = std::filesystem;
-
-class sndModFile : public fs::path 
-{
-public:
-	enum fileType 
-	{ 
-		UNKNOWN, 
-		AUDIO, 
-		VIDEO 
-	};
-	using fs::path::path;
-
-	sndModFile(const fs::path& p, fileType type) 
-		:	fs::path(p), 
-			fileType(type) {}
-	fileType getFileType() const noexcept { return fileType; }
-
-private:
-	fileType fileType = UNKNOWN;
-};
-
 
 class soundFile : public module
 {
@@ -62,7 +43,7 @@ public:
 			}
 			else
 			{
-				sndModFile filePath(filePathStr);
+				fs::path filePath(filePathStr);
 				if (fs::exists(filePath))
 				{
 					const auto extension = filePath.extension();
@@ -81,89 +62,107 @@ public:
 					std::print("No such file or dictory.\n");
 			}
 		} while (true);
-		
-		for (size_t i = 0; i < pathVector.size(); ++i) {
-			pathToObjMap[pathVector[i]] = objVector[i];
-		}
 	}
-	
 	void readSoundFiles()
 	{
+		//create a audioQueue for each sound file.
+		for (auto& soundFile : soundList)
+		{
+			audioQueue<float> soundFileAudioQueue(outputConfig);
+			audio->push_back(std::move(soundFileAudioQueue));
+		}
+		//zip sound file list and audioQueue list together.
+		auto fileQueueMap = std::views::zip(soundList, (*audio));
+
 		std::for_each(
-			std::execution::par,
-			soundList.begin(),
-			soundList.end(), 
-			[this](const fs::path& sndFilePath) 
+			std::execution::par,//parallel execution
+			fileQueueMap.begin(),
+			fileQueueMap.end(),
+			[this](const auto& tuple)//lambda that takes a mapped pair as parameters
 			{
-				//Create a queue for each audio file
-				audioQueue<float> soundFileQueue(outputConfig);
-				audio->push_back(std::move(soundFileQueue));
+				//structure binding into mapped pairs (file -> audioQueue)
+				auto&& [file, queue] = tuple;
 
 				//Create sndfile handle
-				SndfileHandle sndFile(sndFilePath.string());
+				SndfileHandle sndFile(file.string());
 				const auto audioFormatCode = sndFile.format() & SF_FORMAT_SUBMASK;
 				const auto chunkBufferSize = sndFile.samplerate(); // 1 second 
-				
-				
-				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\Rachmaninov Plays Rachmaninov - The Ampico Piano Recordings (1919 -29)\WAV Ver\Liebeslied, Kreisler-Rachmaninov- Alt-Wiener Tanzweisen.wav
-				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\Rachmaninov Plays Rachmaninov - The Ampico Piano Recordings (1919 -29)\WAV Ver\Liebesfreud, Kreisler-Rachmaninov- Alt-Wiener Tanzweisen.wav
+
+				//file reading loop
 				bool quit = false;
 				while (!quit)
 				{
-					//read when there are no enough samples in the queue
+					//PCM 16bit short
 					if (audioFormatCode == SF_FORMAT_PCM_16)
 					{
-						//auto buffer = new short[chunkBufferSize];
 						auto shortBuff = std::make_unique<short[]>(chunkBufferSize);
 						auto floatBuff = std::make_unique<float[]>(chunkBufferSize);
 						while (!quit)
 						{
-							if ((*audio).back().size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							//only read when there are no enough samples.
+							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
 							{
-								auto bytesRead = sndFile.read(shortBuff.get(), chunkBufferSize);
-								if (!bytesRead) quit = true;
-								src_short_to_float_array(shortBuff.get(), floatBuff.get(), chunkBufferSize);
-								std::vector<float> audioData(floatBuff.get(), floatBuff.get() + chunkBufferSize);
-								(*audio).back().push(audioData, sndFile.samplerate(), sndFile.channels());
+								if (!sndFile.read(shortBuff.get(), chunkBufferSize)) 
+									quit = true;//EOF
+								else
+								{
+									src_short_to_float_array(shortBuff.get(), floatBuff.get(), chunkBufferSize);
+									queue.push(std::vector<float>(floatBuff.get(), floatBuff.get() + chunkBufferSize),
+											   sndFile.samplerate(),
+											   sndFile.channels());
+								}
 							}
-							else continue;
 						}
 					}
+					//PCM 32bit float
 					else if (audioFormatCode == SF_FORMAT_PCM_32)
 					{
 						auto floatBuff = std::make_unique<float[]>(chunkBufferSize);
 						while (!quit)
 						{
-							if ((*audio).back().size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							//only read when there are no enough samples.
+							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
 							{
-								auto bytesRead = sndFile.read(floatBuff.get(), chunkBufferSize);
-								if (!bytesRead) quit = true;
-								std::vector<float> audioData(floatBuff.get(), floatBuff.get() + chunkBufferSize);
-								(*audio).back().push(audioData, sndFile.samplerate(), sndFile.channels());
+								if (!sndFile.read(floatBuff.get(), chunkBufferSize)) 
+									quit = true;//EOF
+								else
+									queue.push(std::vector<float>(floatBuff.get(), floatBuff.get() + chunkBufferSize),
+											   sndFile.samplerate(),
+										       sndFile.channels());
 							}
-							else continue;
 						}
 					}
 				}
+				std::print("File end : {}\n", file.filename().string());
 			});
 	}
 	
 	void readVideoFiles()
 	{
-		
+		//create a audioQueue for each video file.
+		for (auto& videoFile : videoList)
+		{
+			audioQueue<float> videoFileAudioQueue(outputConfig);
+			audio->push_back(std::move(videoFileAudioQueue));
+		}
+
+		auto videoQueueView = (*audio) | std::views::drop(soundList.size()) | std::views::take(videoList.size());
+
+		//zip video file list and audioQueue list together.
+		auto fileQueueMap = std::views::zip(videoList, videoQueueView);
+
 		std::for_each(
 			std::execution::par,
-			videoList.begin(),
-			videoList.end(),
-			[this](const fs::path& videoFilePath)
+			fileQueueMap.begin(),
+			fileQueueMap.end(),
+			[this](const auto& tuple)
 			{
-				//create a queue for each file
-				audioQueue<float> videoFloatQueue(outputConfig);
-				audio->push_back(videoFloatQueue);
+				//structure binding into mapped pairs (file -> audioQueue)
+				auto&& [file, queue] = tuple;
 
 				//open file and retrieve stream infos
 				auto fmtCtx = avformat_alloc_context();
-				avformat_open_input(&fmtCtx, videoFilePath.string().c_str(), nullptr, nullptr);
+				avformat_open_input(&fmtCtx, file.string().c_str(), nullptr, nullptr);
 				avformat_find_stream_info(fmtCtx, nullptr);
 
 				//for all stream found
@@ -178,44 +177,57 @@ public:
 						avcodec_parameters_to_context(codecCtx, codecParam);
 						avcodec_open2(codecCtx, codec, nullptr); 
 						
-						std::vector<std::uint8_t> byteData;
+						codecCtx->request_sample_fmt = AV_SAMPLE_FMT_FLTP;
+
 						int sampleRate  = 0;
 						int nbChannels  = 0;
 						int audioFormat = 0;
 
 						auto packet = av_packet_alloc();
-						while (av_read_frame(fmtCtx, packet) >= 0)
+
+						bool quit = false;
+						while(!quit)
 						{
-							if (packet->stream_index == audioStream->index)
+							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
 							{
-								auto frame = av_frame_alloc();
-								auto ret = avcodec_send_packet(codecCtx, packet);
-
-								while (ret >= 0)
+								while (av_read_frame(fmtCtx, packet) >= 0)
 								{
-									ret = avcodec_receive_frame(codecCtx, frame);
-									auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
-
-									audioFormat = frame->format;
-									sampleRate  = frame->sample_rate;
-									nbChannels  = frame->ch_layout.nb_channels;
-									
-									for (int i = 0; i < frame->nb_samples; i++)
+									if (packet->stream_index == audioStream->index)
 									{
-										for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
+										auto frame = av_frame_alloc();
+										auto ret = avcodec_send_packet(codecCtx, packet);
+										if (ret < 0)quit == true;
+										while (ret >= 0)
 										{
-											std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
-											byteData.insert(byteData.end(), data_start, data_start + sampleSize);
-											
+											ret = avcodec_receive_frame(codecCtx, frame);
+											auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
+
+											audioFormat = frame->format;
+											sampleRate = frame->sample_rate;
+											nbChannels = frame->ch_layout.nb_channels;
+
+											const auto bufferSize = frame->nb_samples * codecCtx->ch_layout.nb_channels * sampleSize;
+
+											auto byteData = std::make_unique<std::uint8_t[]>(bufferSize);
+											std::size_t offset = 0;
+											for (int i = 0; i < frame->nb_samples; i++)
+											{
+												for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
+												{
+													std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
+													std::memcpy(byteData.get() + offset, data_start, sampleSize);
+													offset += sampleSize;
+												}
+											}
+											std::size_t floatSize = offset / 4;
+											float* floatData = reinterpret_cast<float*>(byteData.get());
+											queue.push(std::vector<float>(floatData, floatData + floatSize), 44100, 2);
 										}
+										
+
+										//std::print("current audio data count : {}\n", queue.size());
 									}
 								}
-								std::size_t floatSize = byteData.size() / 4;
-								float* floatData = reinterpret_cast<float*>(byteData.data());
-								std::vector<float> floatVec(floatData, floatData + floatSize);
-								(*audio).back().push(floatVec, 44100, 2);
-								byteData.clear();
-								//std::print("current audio data count : {}\n", (*audio).back().size());
 							}
 						}
 					}

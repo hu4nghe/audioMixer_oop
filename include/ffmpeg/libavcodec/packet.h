@@ -501,7 +501,7 @@ typedef struct AVPacket {
      */
     AVPacketSideData *side_data;
     int side_data_elems;
-
+    
     /**
      * Duration of this packet in AVStream->time_base units, 0 if unknown.
      * Equals next_pts - this_pts in presentation order.

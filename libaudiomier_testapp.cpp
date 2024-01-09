@@ -1,5 +1,9 @@
 #include <print>
-#include <print>
+#include <iostream>
+
+#include <iostream>
+#include <vector>
+#include <ranges>
 
 #include "audioMixer.h"
 
@@ -41,35 +45,51 @@ static outputParameter configuration()
 	}
 	return outConfig;
 }
-static bool is_big_endian(void)
-{
-	union {
-		uint32_t i;
-		char c[4]; 
-	} bint = { 0x01020304 };
-
-	return bint.c[0] == 1;
-}
 
 int main()
 {
 	
 	auto config = configuration();
 
-	/* audioMixer test*/
-	
 	audioMixer mixer(config);
 	mixer.startStream();
+}	
 	
-	
-	/*QTFF file parser test*/
+	/*QTFF file parser test
 	/*
 	* auto path = "C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov";
 	QTFF parser(filepath, config);
 	parser.searchAudioInfo();
 	
 	soundFile file(config);
-	file.start();*/
+	file.start();
+	return 0;
+
+
+
+/*
+int main() {
+	std::vector<int> numbers = { 1, 2, 3, 4, 5 };
+	std::vector<char> letters = { 'a', 'b', 'c', 'd', 'e', 'f', 'g' };
+
+	
+	auto numbersRange = numbers;
+
+	
+	auto lastFiveLettersRange = letters | std::views::take(5) ;
+
+
+	auto zippedView = std::views::zip(numbersRange, lastFiveLettersRange);
+
+
+	for (const auto&& [num,let] : zippedView)
+	{
+		num += 1;
+
+		
+		std::cout << "Number: " << num << ", Letter: " << let << std::endl;
+	}
 
 	return 0;
-}
+	return 0;
+}*/
