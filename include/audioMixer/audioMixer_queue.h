@@ -12,8 +12,8 @@
 
     constexpr std::size_t defaultSampleRate = 48000;
     constexpr std::size_t defaultChannelNum = 2;
-    constexpr std::size_t defaultBufferSize = 480000;//10 seconds
-    constexpr std::size_t defaultMinBuffer  = 0;
+    constexpr std::size_t defaultBufferSize = 960000;//20 seconds
+    constexpr std::size_t defaultMinBuffer  = 240000;
     
 /**
  * @brief a struct that declares :
@@ -297,6 +297,11 @@ bool audioQueue<T>::push(      std::vector<T>&  data,
                          const std::uint32_t    inputSampleRate,
                          const std:: uint8_t    inputChannelNumber)
 {
+    if (data.size() + count.load() > outConfig.queueCapacity)
+    {
+        std::print("data size :{}   current count : {}  capacity : {}\n", data.size() , count.load() , outConfig.queueCapacity);
+        return false;
+    }
     if (inputSampleRate != outConfig.sampleRate)
         resample(data, inputSampleRate, inputChannelNumber);
     if (inputChannelNumber != outConfig.channelNumber)
@@ -304,7 +309,9 @@ bool audioQueue<T>::push(      std::vector<T>&  data,
 
     for (const auto &i : data)
         if (!this->enqueue(i))
+        
             return false;
+        
     
     return true;
 }

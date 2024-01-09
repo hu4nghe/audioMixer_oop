@@ -19,9 +19,31 @@ extern "C"
 
 namespace fs = std::filesystem;
 
+class sndModFile : public fs::path 
+{
+public:
+	enum fileType 
+	{ 
+		UNKNOWN, 
+		AUDIO, 
+		VIDEO 
+	};
+	using fs::path::path;
+
+	sndModFile(const fs::path& p, fileType type) 
+		:	fs::path(p), 
+			fileType(type) {}
+	fileType getFileType() const noexcept { return fileType; }
+
+private:
+	fileType fileType = UNKNOWN;
+};
+
+
 class soundFile : public module
 {
 	/*Sound file path*/
+	
 	std::vector<fs::path> soundList;
 	std::vector<fs::path> videoList;
 public:
@@ -40,7 +62,7 @@ public:
 			}
 			else
 			{
-				fs::path filePath(filePathStr);
+				sndModFile filePath(filePathStr);
 				if (fs::exists(filePath))
 				{
 					const auto extension = filePath.extension();
@@ -59,6 +81,10 @@ public:
 					std::print("No such file or dictory.\n");
 			}
 		} while (true);
+		
+		for (size_t i = 0; i < pathVector.size(); ++i) {
+			pathToObjMap[pathVector[i]] = objVector[i];
+		}
 	}
 	
 	void readSoundFiles()
@@ -69,20 +95,56 @@ public:
 			soundList.end(), 
 			[this](const fs::path& sndFilePath) 
 			{
-				SndfileHandle sndFile(sndFilePath.string());
-				const std::size_t bufferSize = sndFile.frames() * sndFile.channels();
-				float* temp = new float[bufferSize];
-				sndFile.read(temp, bufferSize);
-
-				auto soundFileConfig = outputConfig;
-				soundFileConfig.queueCapacity = bufferSize;
-				audioQueue<float> soundFileQueue(soundFileConfig);
-				std::vector<float> audioData(temp, temp + bufferSize);
-
-				soundFileQueue.push(audioData, sndFile.samplerate(), sndFile.channels());
-				delete[] temp;
-
+				//Create a queue for each audio file
+				audioQueue<float> soundFileQueue(outputConfig);
 				audio->push_back(std::move(soundFileQueue));
+
+				//Create sndfile handle
+				SndfileHandle sndFile(sndFilePath.string());
+				const auto audioFormatCode = sndFile.format() & SF_FORMAT_SUBMASK;
+				const auto chunkBufferSize = sndFile.samplerate(); // 1 second 
+				
+				
+				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\Rachmaninov Plays Rachmaninov - The Ampico Piano Recordings (1919 -29)\WAV Ver\Liebeslied, Kreisler-Rachmaninov- Alt-Wiener Tanzweisen.wav
+				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\Rachmaninov Plays Rachmaninov - The Ampico Piano Recordings (1919 -29)\WAV Ver\Liebesfreud, Kreisler-Rachmaninov- Alt-Wiener Tanzweisen.wav
+				bool quit = false;
+				while (!quit)
+				{
+					//read when there are no enough samples in the queue
+					if (audioFormatCode == SF_FORMAT_PCM_16)
+					{
+						//auto buffer = new short[chunkBufferSize];
+						auto shortBuff = std::make_unique<short[]>(chunkBufferSize);
+						auto floatBuff = std::make_unique<float[]>(chunkBufferSize);
+						while (!quit)
+						{
+							if ((*audio).back().size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							{
+								auto bytesRead = sndFile.read(shortBuff.get(), chunkBufferSize);
+								if (!bytesRead) quit = true;
+								src_short_to_float_array(shortBuff.get(), floatBuff.get(), chunkBufferSize);
+								std::vector<float> audioData(floatBuff.get(), floatBuff.get() + chunkBufferSize);
+								(*audio).back().push(audioData, sndFile.samplerate(), sndFile.channels());
+							}
+							else continue;
+						}
+					}
+					else if (audioFormatCode == SF_FORMAT_PCM_32)
+					{
+						auto floatBuff = std::make_unique<float[]>(chunkBufferSize);
+						while (!quit)
+						{
+							if ((*audio).back().size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							{
+								auto bytesRead = sndFile.read(floatBuff.get(), chunkBufferSize);
+								if (!bytesRead) quit = true;
+								std::vector<float> audioData(floatBuff.get(), floatBuff.get() + chunkBufferSize);
+								(*audio).back().push(audioData, sndFile.samplerate(), sndFile.channels());
+							}
+							else continue;
+						}
+					}
+				}
 			});
 	}
 	
@@ -153,7 +215,7 @@ public:
 								std::vector<float> floatVec(floatData, floatData + floatSize);
 								(*audio).back().push(floatVec, 44100, 2);
 								byteData.clear();
-								std::print("current audio data count : {}\n", (*audio).back().size());
+								//std::print("current audio data count : {}\n", (*audio).back().size());
 							}
 						}
 					}
@@ -178,7 +240,7 @@ public:
 				if (!queue.empty())
 					stop = false;
 		}
-		std::print("Press any key to try again.\n");
+		std::print("Press any key to restart.\n");
 		std::cin.ignore();
 		start();
 	}
