@@ -179,53 +179,57 @@ public:
 						
 						codecCtx->request_sample_fmt = AV_SAMPLE_FMT_FLTP;
 
-						int sampleRate  = 0;
-						int nbChannels  = 0;
 						int audioFormat = 0;
+						std::vector<std::uint8_t> byteData;
 
 						auto packet = av_packet_alloc();
-
-						bool quit = false;
-						while(!quit)
+						bool eof = false;
+						while (!eof)
 						{
 							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
 							{
-								while (av_read_frame(fmtCtx, packet) >= 0)
+								av_read_frame(fmtCtx, packet);
+								if (packet->stream_index == audioStream->index)
 								{
-									if (packet->stream_index == audioStream->index)
+									auto frame = av_frame_alloc();
+									auto ret = avcodec_send_packet(codecCtx, packet);
+
+									while (ret >= 0)
 									{
-										auto frame = av_frame_alloc();
-										auto ret = avcodec_send_packet(codecCtx, packet);
-										if (ret < 0)quit == true;
-										while (ret >= 0)
+										ret = avcodec_receive_frame(codecCtx, frame);
+										if (ret == AVERROR(EAGAIN))
+											break;
+										else if (ret == AVERROR_EOF)
 										{
-											ret = avcodec_receive_frame(codecCtx, frame);
-											auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
-
-											audioFormat = frame->format;
-											sampleRate = frame->sample_rate;
-											nbChannels = frame->ch_layout.nb_channels;
-
-											const auto bufferSize = frame->nb_samples * codecCtx->ch_layout.nb_channels * sampleSize;
-
-											auto byteData = std::make_unique<std::uint8_t[]>(bufferSize);
-											std::size_t offset = 0;
-											for (int i = 0; i < frame->nb_samples; i++)
-											{
-												for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
-												{
-													std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
-													std::memcpy(byteData.get() + offset, data_start, sampleSize);
-													offset += sampleSize;
-												}
-											}
-											std::size_t floatSize = offset / 4;
-											float* floatData = reinterpret_cast<float*>(byteData.get());
-											queue.push(std::vector<float>(floatData, floatData + floatSize), 44100, 2);
+											std::print("EOF.\n");
+											eof = true;
+											break;
 										}
-										
+										else if (ret < 0)
+										{
+											std::print("Error reading file.\n");
+											break;
+										}
+										auto sampleSize = av_get_bytes_per_sample(codecCtx->sample_fmt);
 
-										//std::print("current audio data count : {}\n", queue.size());
+										audioFormat = frame->format;
+
+										const auto bufferSize = frame->nb_samples * codecCtx->ch_layout.nb_channels * sampleSize;
+										byteData.reserve(sampleSize);
+
+										for (int i = 0; i < frame->nb_samples; i++)
+											for (int ch = 0; ch < codecCtx->ch_layout.nb_channels; ch++)
+											{
+												std::uint8_t* data_start = frame->data[ch] + sampleSize * i;
+												byteData.insert(byteData.end(), data_start, data_start + sampleSize);
+											}
+										if (byteData.size() == 0)
+											break;
+										std::size_t floatSize = byteData.size() / 4;
+										std::print("pushed size :{}\n", floatSize);
+										float* floatData = reinterpret_cast<float*>(byteData.data());
+										queue.push(std::vector<float>(floatData, floatData + floatSize), 44100, 2);
+										byteData.clear();
 									}
 								}
 							}
@@ -264,41 +268,3 @@ public:
 };
 
 #endif//AUDIOMIXER_FILE_H
-
-/*
-static void decode(AVCodecContext* dec_ctx, AVPacket* pkt, AVFrame* frame, std::vector<uint8_t>& audioSamples)
-{
-	int i, ch;
-	int ret, data_size;
-
-	//send the packet with the compressed data to the decoder 
-	ret = avcodec_send_packet(dec_ctx, pkt);
-	if (ret < 0)
-	{
-		fprintf(stderr, "Error submitting the packet to the decoder\n");
-		exit(1);
-	}
-
-	//read all the output frames (in general there may be any number of them 
-	while (ret >= 0)
-	{
-		ret = avcodec_receive_frame(dec_ctx, frame);
-		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-			return;
-		else if (ret < 0)
-		{
-			fprintf(stderr, "Error during decoding\n");
-			exit(1);
-		}
-		data_size = av_get_bytes_per_sample(dec_ctx->sample_fmt);
-		if (data_size < 0)
-		{
-			//This should not occur, checking just for paranoia
-			fprintf(stderr, "Failed to calculate data size\n");
-			exit(1);
-		}
-		for (i = 0; i < frame->nb_samples; i++)
-			for (ch = 0; ch < dec_ctx->channels; ch++)
-				audioSamples.push_back(frame->data[ch][data_size * i]);
-	}
-}*/
