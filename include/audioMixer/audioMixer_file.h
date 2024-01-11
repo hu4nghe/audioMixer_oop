@@ -18,8 +18,15 @@ extern "C"
 #include <fstream>
 
 #include "audioMixer_base.h"
+#include "audioMixer_QTFF_Parser.h"
 
 namespace fs = std::filesystem;
+
+/*
+ * a function which allows user to extract sound file from a video, in base of libavcodec(ffmpeg) is optional.
+ * define FFMPEG_MOV_MODULE_ENABLE to enable this function.
+ */
+//#define FFMPEG_MOV_MODULE_ENABLE
 
 class soundFile : public module
 {
@@ -100,7 +107,7 @@ public:
 						while (!quit)
 						{
 							//only read when there are no enough samples.
-							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
 							{
 								if (!sndFile.read(shortBuff.get(), chunkBufferSize)) 
 									quit = true;//EOF
@@ -115,13 +122,13 @@ public:
 						}
 					}
 					//PCM 32bit float
-					else if (audioFormatCode == SF_FORMAT_PCM_32)
+					else if (audioFormatCode == SF_FORMAT_PCM_32 || audioFormatCode == SF_FORMAT_FLOAT)
 					{
 						auto floatBuff = std::make_unique<float[]>(chunkBufferSize);
 						while (!quit)
 						{
 							//only read when there are no enough samples.
-							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
 							{
 								if (!sndFile.read(floatBuff.get(), chunkBufferSize)) 
 									quit = true;//EOF
@@ -136,8 +143,9 @@ public:
 				std::print("File end : {}\n", file.filename().string());
 			});
 	}
-	
-	void readVideoFiles()
+	//TRAINoutput.wav
+#ifdef FFMPEG_MOV_MODULE_ENABLE
+	void readVideoFiles_ffmpeg ()
 	{
 		//create a audioQueue for each video file.
 		for (auto& videoFile : videoList)
@@ -228,7 +236,9 @@ public:
 										std::size_t floatSize = byteData.size() / 4;
 										std::print("pushed size :{}\n", floatSize);
 										float* floatData = reinterpret_cast<float*>(byteData.data());
-										queue.push(std::vector<float>(floatData, floatData + floatSize), 44100, 2);
+										queue.push(std::vector<float>(floatData, floatData + floatSize), 
+												   frame->sample_rate, 
+												   frame->ch_layout.nb_channels);
 										byteData.clear();
 									}
 								}
@@ -239,15 +249,39 @@ public:
 				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
 			});
 	}
+#endif
+	void readVideoFiles_QTFF_Parser()
+	{
+		for (auto& videoFile : videoList)
+		{
+			audioQueue<float> videoFileAudioQueue(outputConfig);
+			audio->push_back(std::move(videoFileAudioQueue));
+		}
+
+		auto videoQueueView = (*audio) | std::views::drop(soundList.size()) | std::views::take(videoList.size());
+
+		//zip video file list and audioQueue list together.
+		auto fileQueueMap = std::views::zip(videoList, videoQueueView);
+		for (auto&& [file, queue] : fileQueueMap)
+		{
+			QTFF parser(file, outputConfig);
+			parser.searchAudioInfo();
+			queue.push(parser.getData(),parser.getSampleRate(), parser.getChannel());
+		}
+	}
 	void start() override
 	{
 		std::print("file Module is activated.\n");
 		active = true;
+
 		soundList.clear();
 		videoList.clear();
 		selectFile();
 		readSoundFiles();
-		readVideoFiles();
+#ifdef FFMPEG_MOV_MODULE_ENABLE
+		readVideoFiles_ffmpeg();
+#endif
+		readVideoFiles_QTFF_Parser();
 		bool stop = false;
 		while (!stop) 
 		{

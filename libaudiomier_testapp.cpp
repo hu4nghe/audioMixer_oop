@@ -6,6 +6,7 @@
 #include <ranges>
 
 #include "audioMixer.h"
+#include "audioMixer_QTFF_Parser.h"
 
 /*
 * function for output configurations : sample rate, channel number, buffersize(in second)
@@ -50,14 +51,14 @@ int main()
 {
 	
 	auto config = configuration();
-
+	
 	audioMixer mixer(config);
 	mixer.startStream();
 }	
 	
 	/*QTFF file parser test
 	/*
-	* auto path = "C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov";
+	* auto path = "C:\\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov";
 	QTFF parser(filepath, config);
 	parser.searchAudioInfo();
 	

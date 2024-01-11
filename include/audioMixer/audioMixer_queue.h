@@ -10,10 +10,10 @@
 
 #pragma region Output parameters class
 
-    constexpr std::size_t defaultSampleRate = 48000;
+    constexpr std::size_t defaultSampleRate = 44100;
     constexpr std::size_t defaultChannelNum = 2;
-    constexpr std::size_t defaultBufferSize = 960000;//20 seconds
-    constexpr std::size_t defaultMinBuffer  = 240000;
+    constexpr std::size_t defaultBufferSize = 441000;//1 seconds
+    constexpr std::size_t defaultMinBuffer  = 8820;
     
 /**
  * @brief a struct that declares :
@@ -307,10 +307,9 @@ bool audioQueue<T>::push(      std::vector<T>&& data,
 
     for (const auto &i : data)
         if (!this->enqueue(i))
-        
             return false;
-        
-    
+
+    std::print("{}element pushed.\n", data.size());
     return true;
 }
 /**
@@ -334,7 +333,6 @@ bool audioQueue<T>::pop(                T*& data,
     for (std::size_t i = 0; i < frames * outConfig.channelNumber; i++)
         if (!this->dequeue(data[i],mode))
             return false;
-
     return true;
 }
 
