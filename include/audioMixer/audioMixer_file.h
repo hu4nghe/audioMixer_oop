@@ -257,6 +257,8 @@ public:
 				auto buffer = parser.getData();
 				auto sampleRate = parser.getSampleRate();
 				auto nbChannels = parser.getChannel();
+				auto data = parser.getData();
+
 				auto eof = buffer.size();
 				
 				bool quit = false;
@@ -266,19 +268,18 @@ public:
 					if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
 					{
 						auto chunkBufferSize = sampleRate * nbChannels;
-						queue.push(std::vector<float>(parser.getData().begin() + pos,
-													  parser.getData().begin() + pos + chunkBufferSize),
+						queue.push(std::vector<float>(data.begin() + pos,
+													  data.begin() + pos + chunkBufferSize),
 								   sampleRate, 
 								   nbChannels);
-						pos += chunkBufferSize;
-						if (pos > eof)
+						pos += chunkBufferSize;//chunkBufferSize element has been diffused.
+						if (pos + chunkBufferSize >= eof)//try to see if next diffusion will leak
 						{
-							pos -= chunkBufferSize;
-							auto lastChunkSize = eof - pos;
-							queue.push(std::vector<float>(parser.getData().begin() + pos,
-														  parser.getData().begin() + pos + lastChunkSize),
+							queue.push(std::vector<float>(data.begin() + pos,
+														  data.end()),
 									   sampleRate,
 								       nbChannels);
+							quit = true;
 						}
 					}
 				}

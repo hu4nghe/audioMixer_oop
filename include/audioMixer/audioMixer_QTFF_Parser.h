@@ -265,11 +265,8 @@ public:
                     
                     fileStream->seekg(16, std::ios::cur);//seek target(1)
                     fileStream->readBigEndian(channelCount);
-                    std::print("channel number : {}\n", channelCount);
-
                     fileStream->seekg(4, std::ios::cur);//seek target(3)
                     fileStream->readBigEndian(sampleRate);
-                    std::print("sample rate    : {}\n\n", sampleRate);
                 }
                 stsdAtom.skip();
 
@@ -327,7 +324,6 @@ public:
                 std::uint32_t nbChunk = 0;
                 fileStream->readBigEndian(nbChunk);
                 std::vector<uint32_t> stcoTable(nbChunk);
-                std::print("nb chunk:{}\n",nbChunk);
 
                 std::uint32_t chunkOffset = 0;
                 for (auto i = 0; i < nbChunk; i++)
@@ -355,8 +351,6 @@ public:
                 std::uint32_t nbEntriesStsc = 0;
                 fileStream->seekg(4, std::ios::cur);
                 fileStream->readBigEndian(nbEntriesStsc);
-
-                std::print("nb stsc:{}\n", nbEntriesStsc);
 
                 std::uint32_t temp = 0;
 

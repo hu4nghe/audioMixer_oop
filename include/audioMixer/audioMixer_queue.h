@@ -309,7 +309,6 @@ bool audioQueue<T>::push(      std::vector<T>&& data,
         if (!this->enqueue(i))
             return false;
 
-    std::print("{}element pushed.\n", data.size());
     return true;
 }
 /**
