@@ -17,34 +17,6 @@ constexpr std::uint32_t moovCode = 0x6D6F6F76;
 constexpr std::uint32_t trakCode = 0x7472616B;
 constexpr std::uint32_t sounCode = 0x736F756E;
 
-static std::vector<float> merge_uint8_to_float(const std::vector<int8_t>& input) {
-    
-    std::vector<float> result;
-
-    
-    if (input.size() % 4 != 0) {
-      
-        return result;
-    }
-
-    for (size_t i = 0; i < input.size(); i += 4) {
-        
-        uint32_t value = (static_cast<uint32_t>(input[i]) << 24) |
-            (static_cast<uint32_t>(input[i + 1]) << 16) |
-            (static_cast<uint32_t>(input[i + 2]) << 8) |
-            (static_cast<uint32_t>(input[i + 3]));
-
-        float floatValue;
-        
-        std::memcpy(&floatValue, &value, sizeof(float));
-
-       
-        result.push_back(floatValue);
-    }
-
-    return result;
-}
-
 static std::string getStr(std::uint32_t code)
 {
     std::bitset<32> bits(code);
@@ -93,9 +65,12 @@ public:
     void readBigEndian(T& value)
     {
         this->read(reinterpret_cast<char*>(&value), sizeof(T));
-        for (size_t i = 0; i < sizeof(T) / 2; ++i)
-        std::swap(reinterpret_cast<std::uint8_t*>(&value)[i], 
-                  reinterpret_cast<std::uint8_t*>(&value)[sizeof(T) - 1 - i]);
+        
+        if (sizeof(T) >= 2)
+            for (auto i = 0; i < sizeof(T) / 2; i++)
+                std::swap(reinterpret_cast<std::uint8_t*>(&value)[i],
+                          reinterpret_cast<std::uint8_t*>(&value)[sizeof(T) - 1 - i]);
+        
     }
 };
 
@@ -146,8 +121,8 @@ class QTFF
 {
     sPtr<fileReader> fileStream;
     std::vector<atom> soundTracksMdia;
-    std::vector<std::int8_t> byteVector;
-    std::vector<float> floatArray;
+    std::vector<std::int8_t> byteData;
+    std::vector<float> floatData;
     std::size_t eof;
     std::uint16_t channelCount = 0;
     std::uint32_t sampleRate = 0;
@@ -159,7 +134,7 @@ public:
             fileStream = std::make_shared<fileReader>();
             fileStream->open(qtffFile.c_str(), std::ios::binary);
             if (!fileStream->is_open())
-                throw std::invalid_argument(std::format("Failed to open file : {}\n", qtffFile.string()));
+                throw modObjNotFound(std::format("Failed to open file : {}\n", qtffFile.string()));
             
             fileStream->seekg(0, std::ios::end);
             eof = fileStream->tellg();
@@ -167,10 +142,10 @@ public:
 
             atom fileType(fileStream);
             if (!fileType.typeIs("ftyp"))
-                throw std::invalid_argument("Not a valid QTFF file.");
+                throw modObjNotFound("Not a valid QTFF file.");
             fileType.skip();
         }
-        catch (const std::invalid_argument& e)
+        catch (const modObjNotFound& e)
         {
             throw std::runtime_error(std::format("Failed to parse file : {}.", e.what()));
         }
@@ -195,7 +170,7 @@ public:
     void findSoundTrack(atom& track)
     {
         if (getStr(track.type()) != "trak")
-            throw std::invalid_argument("Not a trak atom.");
+            throw modObjNotFound("Not a trak atom.");
         auto mdiaAtom = searchAtom("mdia");
         auto hdlrAtom = searchAtom("hdlr");
         /*
@@ -443,36 +418,30 @@ public:
                             for(int j = 0; j < sampleSize;j++)
                             {
                                 fileStream->readBigEndian(sampleTemp);
-                                byteVector.push_back(sampleTemp);
+                                byteData.push_back(sampleTemp);
                                 sampleReadCount++;
                             }
                         else
                             for (auto j = 0; j < stszTable[sampleReadCount]; j++)
                             {
                                 fileStream->readBigEndian(sampleTemp);
-                                byteVector.push_back(sampleTemp);
+                                byteData.push_back(sampleTemp);
                                 sampleReadCount++;
                             }
                     }
                 }
-                std::size_t floatVectorSize = byteVector.size() / sizeof(float);
+                std::size_t floatVectorSize = byteData.size() / sizeof(float);
 
                 
-                floatArray.resize(floatVectorSize);
+                floatData.resize(floatVectorSize);
 
                 for (std::size_t i = 0; i < floatVectorSize; ++i) 
                 {
                     float floatValue;
-                    std::memcpy(&floatValue, &byteVector[i * sizeof(float)], sizeof(float));
-                    floatArray[i] = floatValue;
+                    std::memcpy(&floatValue, &byteData[i * sizeof(float)], sizeof(float));
+                    floatData[i] = floatValue;
                 }
-                std::size_t sum = 0;
-                for (auto& i : completeTable)
-                {
-                    sum += i;
-                }
-                std::print("sample sum : {}\n", sum);
-                std::print("float count : {}\n", floatArray.size());
+
                 break;
             }
         }
@@ -482,10 +451,9 @@ public:
             throw;
         }
     }
-    std::vector<float> getData() { return floatArray; }
-    std::uint32_t getSampleRate() { return sampleRate; }
-    std::uint16_t getChannel() { return channelCount; }
+    std::vector<float> getData() const { return floatData; }
+    std::uint32_t getSampleRate() const { return sampleRate; }
+    std::uint16_t getChannel() const { return channelCount; }
 };
 //C:\Users\Modulo\Desktop\ffmpeg-master-latest-win64-gpl\bin\output_with_new_audio.mov
 #endif
-

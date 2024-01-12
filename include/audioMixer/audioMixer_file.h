@@ -1,15 +1,22 @@
 #ifndef AUDIOMIXER_FILE_H
 #define AUDIOMIXER_FILE_H
 
+/*
+ * a function which allows user to extract sound file from a video, in base of libavcodec(ffmpeg) is optional.
+ * define FFMPEG_MOV_MODULE_ENABLE to enable this function.
+ */
+ //#define FFMPEG_MOV_MODULE_ENABLE
+
 #include "sndfile.hh"
 
-//ffmpeg headers
+#ifdef FFMPEG_MOV_MODULE_ENABLE
 extern "C"
 {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswresample/swresample.h>
 }
+#endif
 
 #include <algorithm>
 #include <execution>
@@ -22,11 +29,7 @@ extern "C"
 
 namespace fs = std::filesystem;
 
-/*
- * a function which allows user to extract sound file from a video, in base of libavcodec(ffmpeg) is optional.
- * define FFMPEG_MOV_MODULE_ENABLE to enable this function.
- */
-//#define FFMPEG_MOV_MODULE_ENABLE
+
 
 class soundFile : public module
 {
@@ -93,7 +96,7 @@ public:
 				//Create sndfile handle
 				SndfileHandle sndFile(file.string());
 				const auto audioFormatCode = sndFile.format() & SF_FORMAT_SUBMASK;
-				const auto chunkBufferSize = sndFile.samplerate(); // 1 second 
+				const auto chunkBufferSize = sndFile.samplerate() * sndFile.channels(); // 1 second 
 
 				//file reading loop
 				bool quit = false;
@@ -144,8 +147,8 @@ public:
 			});
 	}
 	//TRAINoutput.wav
-#ifdef FFMPEG_MOV_MODULE_ENABLE
-	void readVideoFiles_ffmpeg ()
+
+	void readVideoFiles ()
 	{
 		//create a audioQueue for each video file.
 		for (auto& videoFile : videoList)
@@ -167,7 +170,7 @@ public:
 			{
 				//structure binding into mapped pairs (file -> audioQueue)
 				auto&& [file, queue] = tuple;
-
+#ifdef FFMPEG_MOV_MODULE_ENABLE
 				//open file and retrieve stream infos
 				auto fmtCtx = avformat_alloc_context();
 				avformat_open_input(&fmtCtx, file.string().c_str(), nullptr, nullptr);
@@ -245,30 +248,47 @@ public:
 							}
 						}
 					}
+
 				}
 				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
+#else
+				QTFF parser(file,outputConfig);
+				parser.searchAudioInfo();
+				auto buffer = parser.getData();
+				auto sampleRate = parser.getSampleRate();
+				auto nbChannels = parser.getChannel();
+				auto eof = buffer.size();
+				
+				bool quit = false;
+				std::size_t pos = 0;
+				while (!quit)
+				{
+					if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
+					{
+						auto chunkBufferSize = sampleRate * nbChannels;
+						queue.push(std::vector<float>(parser.getData().begin() + pos,
+													  parser.getData().begin() + pos + chunkBufferSize),
+								   sampleRate, 
+								   nbChannels);
+						pos += chunkBufferSize;
+						if (pos > eof)
+						{
+							pos -= chunkBufferSize;
+							auto lastChunkSize = eof - pos;
+							queue.push(std::vector<float>(parser.getData().begin() + pos,
+														  parser.getData().begin() + pos + lastChunkSize),
+									   sampleRate,
+								       nbChannels);
+						}
+					}
+				}
+
+#endif
+
 			});
 	}
-#endif
-	void readVideoFiles_QTFF_Parser()
-	{
-		for (auto& videoFile : videoList)
-		{
-			audioQueue<float> videoFileAudioQueue(outputConfig);
-			audio->push_back(std::move(videoFileAudioQueue));
-		}
 
-		auto videoQueueView = (*audio) | std::views::drop(soundList.size()) | std::views::take(videoList.size());
-
-		//zip video file list and audioQueue list together.
-		auto fileQueueMap = std::views::zip(videoList, videoQueueView);
-		for (auto&& [file, queue] : fileQueueMap)
-		{
-			QTFF parser(file, outputConfig);
-			parser.searchAudioInfo();
-			queue.push(parser.getData(),parser.getSampleRate(), parser.getChannel());
-		}
-	}
+	
 	void start() override
 	{
 		std::print("file Module is activated.\n");
@@ -278,10 +298,7 @@ public:
 		videoList.clear();
 		selectFile();
 		readSoundFiles();
-#ifdef FFMPEG_MOV_MODULE_ENABLE
-		readVideoFiles_ffmpeg();
-#endif
-		readVideoFiles_QTFF_Parser();
+		readVideoFiles();
 		bool stop = false;
 		while (!stop) 
 		{
