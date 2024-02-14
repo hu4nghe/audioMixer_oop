@@ -13,7 +13,7 @@
     constexpr std::size_t defaultSampleRate = 44100;
     constexpr std::size_t defaultChannelNum = 2;
     constexpr std::size_t defaultBufferSize = 441000;//1 seconds
-    constexpr std::size_t defaultMinBuffer  = 8820;
+    constexpr std::size_t defaultMinBuffer  = 0;
     
 /**
  * @brief a struct that declares :

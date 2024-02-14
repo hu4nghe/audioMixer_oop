@@ -31,7 +31,7 @@ namespace fs = std::filesystem;
 
 
 
-class soundFile : public module
+class soundFile : public audioMixerModule_base
 {
 	/*Sound file path*/
 	
@@ -96,7 +96,7 @@ public:
 				//Create sndfile handle
 				SndfileHandle sndFile(file.string());
 				const auto audioFormatCode = sndFile.format() & SF_FORMAT_SUBMASK;
-				const auto chunkBufferSize = sndFile.samplerate() * sndFile.channels(); // 1 second 
+				const auto chunkBufferSize = 3 * sndFile.samplerate() * sndFile.channels(); // 3 second 
 
 				//file reading loop
 				bool quit = false;
@@ -267,7 +267,7 @@ public:
 				{
 					if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
 					{
-						auto chunkBufferSize = sampleRate * nbChannels;
+						auto chunkBufferSize = 3 * sampleRate * nbChannels;
 						queue.push(std::vector<float>(data.begin() + pos,
 													  data.begin() + pos + chunkBufferSize),
 								   sampleRate, 
@@ -298,8 +298,8 @@ public:
 		soundList.clear();
 		videoList.clear();
 		selectFile();
-		readSoundFiles();
-		readVideoFiles();
+		std::jthread audioThread(&soundFile::readSoundFiles,this);
+		std::jthread videoThread(&soundFile::readVideoFiles,this);
 		bool stop = false;
 		while (!stop) 
 		{

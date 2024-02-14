@@ -100,7 +100,7 @@ public:
 	}
 };
 
-class NDI : public module
+class NDI : public audioMixerModule_base
 {
 	std::vector<NDIReceiver> recvList;
 public:
