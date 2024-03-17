@@ -147,15 +147,15 @@
     <ClInclude Include="include\audioMixer\audioMixer_impl.h" />
     <ClInclude Include="include\audioMixer\audioMixer_NDI_Recv.h" />
     <ClInclude Include="include\audioMixer\audioMixer_QTFF_Parser.h" />
-    <ClInclude Include="include\audioMixer\audioMixer_queue.h" />
+    <ClInclude Include="include\audioMixer\audio_exception.h" />
+    <ClInclude Include="include\audioMixer\audio_output_context.h" />
+    <ClInclude Include="include\audioMixer\audio_output_queue.h" />
+    <ClInclude Include="include\audioMixer\audio_types.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="include\audioMixer\audio_output_queue.cpp" />
+    <ClCompile Include="include\audioMixer\audio_types.cpp" />
     <ClCompile Include="libaudiomier_testapp.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram.cd" />
-    <None Include="ClassDiagram1.cd" />
-    <None Include="ClassDiagram2.cd" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

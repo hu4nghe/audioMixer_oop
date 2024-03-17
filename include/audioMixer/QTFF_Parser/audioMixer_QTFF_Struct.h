@@ -11,7 +11,7 @@
 
 //criteria function concept
 template <typename F, typename Arg>
-concept Criteria = requires(F func, Arg arg){ { func(arg) } -> std::same_as<bool>; };
+concept criteria = requires(F func, Arg arg){ { func(arg) } -> std::same_as<bool>; };
 
 //std::shared_ptr alias
 template <typename T>

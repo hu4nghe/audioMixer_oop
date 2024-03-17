@@ -24,9 +24,9 @@ class audioMixer
 {
 	using modulePool = std::unordered_map<std::string, std::unique_ptr<module>>;
 	
-	     modulePool	 inputModules;
-	outputParameter  outputConfig;
-		   PaStream* paStreamOut;
+	      modulePool inputModules;
+	 audio_output_context output_context;
+	 	   PaStream* paStreamOut;
 	//portaudio functions
 	static int PaCallbackTransfer(PA_CALLBACK_PARAM_LIST, void* userData);
 
@@ -38,7 +38,7 @@ class audioMixer
 	template<inputMod_t U>
 	void inputModInit();
 public:
-    audioMixer(const outputParameter& outputCfg);
+    audioMixer(const audio_output_context& outputCfg);
 	void startStream();
 };
 
@@ -52,7 +52,7 @@ inline void audioMixer::inputModInit	  ()
 		if (!inputModules.contains(typeName))
 		{
 			inputModules.insert(std::make_pair <std::string, std::unique_ptr <U>>
-				(typeName, std::make_unique<U>(outputConfig)));
+				(typeName, std::make_unique<U>(output_context)));
 
 			std::print("{} module is enabled.\n", typeName);
 		}
@@ -65,8 +65,8 @@ inline void audioMixer::inputModInit	  ()
 		std::print("Module is not enabled.\n");
 	}
 }
-audioMixer::audioMixer		  (const outputParameter& outputCfg)
-	: outputConfig(outputCfg)
+audioMixer::audioMixer		  (const audio_output_context& outputCfg)
+	: output_context(outputCfg)
 {
 	/*Module select*/
 	char ch		 {};
@@ -106,9 +106,9 @@ audioMixer::audioMixer		  (const outputParameter& outputCfg)
 	PaErrorCheck(Pa_Initialize());
 	PaErrorCheck(Pa_OpenDefaultStream(&paStreamOut,
 									   0,							//output only
-									   outputConfig.channelNumber,
+									   output_context.channelNumber,
 									   paFloat32,					//32 bit float [-1;1]
-									   outputConfig.sampleRate,
+									   output_context.sample_rate,
 									   64,							//frames per buffer
 									  &audioMixer::PaCallbackTransfer,
 								       this));

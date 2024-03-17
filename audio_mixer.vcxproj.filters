@@ -18,9 +18,6 @@
     <ClInclude Include="include\audioMixer\audioMixer_base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\audioMixer\audioMixer_queue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\audioMixer\audioMixer_NDI_Recv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -39,15 +36,28 @@
     <ClInclude Include="include\audioMixer\audioMixer_QTFF_Parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\audioMixer\audio_output_context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\audioMixer\audio_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\audioMixer\audio_exception.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\audioMixer\audio_output_queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="libaudiomier_testapp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram.cd" />
-    <None Include="ClassDiagram1.cd" />
-    <None Include="ClassDiagram2.cd" />
+    <ClCompile Include="include\audioMixer\audio_types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="include\audioMixer\audio_output_queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

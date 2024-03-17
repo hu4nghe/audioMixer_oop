@@ -125,9 +125,9 @@ class QTFF
     std::vector<float> floatData;
     std::size_t eof;
     std::uint16_t channelCount = 0;
-    std::uint32_t sampleRate = 0;
+    std::uint32_t sample_rate = 0;
 public:
-    QTFF(const fs::path& qtffFile, const outputParameter& outputConfig)
+    QTFF(const fs::path& qtffFile, const audio_output_context& output_context)
     {
         try
         {
@@ -266,7 +266,7 @@ public:
                     fileStream->seekg(16, std::ios::cur);//seek target(1)
                     fileStream->readBigEndian(channelCount);
                     fileStream->seekg(4, std::ios::cur);//seek target(3)
-                    fileStream->readBigEndian(sampleRate);
+                    fileStream->readBigEndian(sample_rate);
                 }
                 stsdAtom.skip();
 
@@ -446,7 +446,7 @@ public:
         }
     }
     std::vector<float> getData() const { return floatData; }
-    std::uint32_t getSampleRate() const { return sampleRate; }
+    std::uint32_t getSampleRate() const { return sample_rate; }
     std::uint16_t getChannel() const { return channelCount; }
 };
 //C:\Users\Modulo\Desktop\ffmpeg-master-latest-win64-gpl\bin\output_with_new_audio.mov

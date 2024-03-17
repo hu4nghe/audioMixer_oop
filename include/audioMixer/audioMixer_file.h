@@ -33,12 +33,10 @@ namespace fs = std::filesystem;
 
 class soundFile : public audioMixerModule_base
 {
-	/*Sound file path*/
-	
 	std::vector<fs::path> soundList;
 	std::vector<fs::path> videoList;
 public:
-	soundFile(const outputParameter& outputCfg) : module(outputCfg) {}
+	soundFile(const audio_output_context& outputCfg) : module(outputCfg) {}
 	void selectFile()
 	{
 		std::print("Please enter the path of the sound file.\nE(nd)\n");
@@ -75,13 +73,13 @@ public:
 	}
 	void readSoundFiles()
 	{
-		//create a audioQueue for each sound file.
+		//create a audio_queue for each sound file.
 		for (auto& soundFile : soundList)
 		{
-			audioQueue<float> soundFileAudioQueue(outputConfig);
+			audio_queue<float> soundFileAudioQueue(output_context);
 			audio->push_back(std::move(soundFileAudioQueue));
 		}
-		//zip sound file list and audioQueue list together.
+		//zip sound file list and audio_queue list together.
 		auto fileQueueMap = std::views::zip(soundList, (*audio));
 
 		std::for_each(
@@ -90,7 +88,7 @@ public:
 			fileQueueMap.end(),
 			[this](const auto& tuple)//lambda that takes a mapped pair as parameters
 			{
-				//structure binding into mapped pairs (file -> audioQueue)
+				//structure binding into mapped pairs (file -> audio_queue)
 				auto&& [file, queue] = tuple;
 
 				//Create sndfile handle
@@ -110,7 +108,7 @@ public:
 						while (!quit)
 						{
 							//only read when there are no enough samples.
-							if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
+							if (queue.size() <= output_context.minimumElement * output_context.channelNumber)
 							{
 								if (!sndFile.read(shortBuff.get(), chunkBufferSize)) 
 									quit = true;//EOF
@@ -131,7 +129,7 @@ public:
 						while (!quit)
 						{
 							//only read when there are no enough samples.
-							if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
+							if (queue.size() <= output_context.minimumElement * output_context.channelNumber)
 							{
 								if (!sndFile.read(floatBuff.get(), chunkBufferSize)) 
 									quit = true;//EOF
@@ -146,20 +144,19 @@ public:
 				std::print("File end : {}\n", file.filename().string());
 			});
 	}
-	//TRAINoutput.wav
-
 	void readVideoFiles ()
 	{
-		//create a audioQueue for each video file.
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		//create a audio_queue for each video file.
 		for (auto& videoFile : videoList)
 		{
-			audioQueue<float> videoFileAudioQueue(outputConfig);
+			audio_queue<float> videoFileAudioQueue(output_context);
 			audio->push_back(std::move(videoFileAudioQueue));
 		}
 
 		auto videoQueueView = (*audio) | std::views::drop(soundList.size()) | std::views::take(videoList.size());
 
-		//zip video file list and audioQueue list together.
+		//zip video file list and audio_queue list together.
 		auto fileQueueMap = std::views::zip(videoList, videoQueueView);
 
 		std::for_each(
@@ -168,7 +165,7 @@ public:
 			fileQueueMap.end(),
 			[this](const auto& tuple)
 			{
-				//structure binding into mapped pairs (file -> audioQueue)
+				//structure binding into mapped pairs (file -> audio_queue)
 				auto&& [file, queue] = tuple;
 #ifdef FFMPEG_MOV_MODULE_ENABLE
 				//open file and retrieve stream infos
@@ -197,7 +194,7 @@ public:
 						bool eof = false;
 						while (!eof)
 						{
-							if (queue.size() < outputConfig.minimumElement * outputConfig.channelNumber)
+							if (queue.size() < output_context.minimumElement * output_context.channelNumber)
 							{
 								av_read_frame(fmtCtx, packet);
 								if (packet->stream_index == audioStream->index)
@@ -252,10 +249,10 @@ public:
 				}
 				//C:\Users\Modulo\Desktop\Nouveau_dossier\Music\TRAIN.mov
 #else
-				QTFF parser(file,outputConfig);
+				QTFF parser(file,output_context);
 				parser.searchAudioInfo();
 				auto buffer = parser.getData();
-				auto sampleRate = parser.getSampleRate();
+				auto sample_rate = parser.getSampleRate();
 				auto nbChannels = parser.getChannel();
 				auto data = parser.getData();
 
@@ -265,19 +262,19 @@ public:
 				std::size_t pos = 0;
 				while (!quit)
 				{
-					if (queue.size() <= outputConfig.minimumElement * outputConfig.channelNumber)
+					if (queue.size() <= output_context.minimumElement * output_context.channelNumber)
 					{
-						auto chunkBufferSize = 3 * sampleRate * nbChannels;
+						auto chunkBufferSize = 3 * sample_rate * nbChannels;
 						queue.push(std::vector<float>(data.begin() + pos,
 													  data.begin() + pos + chunkBufferSize),
-								   sampleRate, 
+								   sample_rate, 
 								   nbChannels);
 						pos += chunkBufferSize;//chunkBufferSize element has been diffused.
 						if (pos + chunkBufferSize >= eof)//try to see if next diffusion will leak
 						{
 							queue.push(std::vector<float>(data.begin() + pos,
 														  data.end()),
-									   sampleRate,
+									   sample_rate,
 								       nbChannels);
 							quit = true;
 						}
@@ -288,8 +285,6 @@ public:
 
 			});
 	}
-
-	
 	void start() override
 	{
 		std::print("file Module is activated.\n");

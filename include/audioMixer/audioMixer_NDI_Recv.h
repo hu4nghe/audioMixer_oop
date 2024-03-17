@@ -70,8 +70,8 @@ public:
 		if(!receiver)
 			throw modFatalErr("Failed to create NDI receiver !");
 	}
-	template <audio_t T>
-	void extractAudio(audioQueue<T>& audio)
+	template <audio_type T>
+	void extractAudio(audio_queue<T>& audio)
 	{
 		NDIlib_audio_frame_v2_t audioInput {};
 		if (NDIlib_recv_capture_v2(receiver, nullptr, &audioInput, nullptr, 0) == NDIlib_frame_type_audio)
@@ -104,7 +104,7 @@ class NDI : public audioMixerModule_base
 {
 	std::vector<NDIReceiver> recvList;
 public:
-	NDI(const outputParameter& outputCfg);
+	NDI(const audio_output_context& outputCfg);
 
     void start() override;
     void stop () override;
@@ -119,7 +119,7 @@ public:
  * 
  * @param outputCfg ouput parameters 
  */
-	 NDI::NDI	   (const outputParameter& outputCfg)
+	 NDI::NDI	   (const audio_output_context& outputCfg)
 	:	module(outputCfg) {}
 
 /**
@@ -215,8 +215,8 @@ void NDI::srcSearch()
 			}
 			if (!sourceMatched) std::print("No source matched! Please try again.\n");
 		} while (true);
-		//create a audioQueue for each selected NDI receiver.
-		audio->resize(recvList.size(), audioQueue<float>(outputConfig));
+		//create a audio_queue for each selected NDI receiver.
+		audio->resize(recvList.size(), audio_queue<float>(output_context));
 	}
 	catch (const modFatalErr& fatalErr)
 	{

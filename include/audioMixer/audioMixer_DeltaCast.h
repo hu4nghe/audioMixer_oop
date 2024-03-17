@@ -69,7 +69,7 @@ class deltaCast : public audioMixerModule_base
     auto byteCombineToShort(const std::uint8_t* sourceAudio,
                             const std:: size_t  sourceSize) -> std::vector<short>;
 public:
-	deltaCast(const outputParameter& outputCfg);
+	deltaCast(const audio_output_context& outputCfg);
 
 	void start            () override;
 	void stop             () override;
@@ -82,7 +82,7 @@ public:
 
 #pragma region IMPL
 
-            deltaCast::deltaCast         (const outputParameter& outputCfg)
+            deltaCast::deltaCast         (const audio_output_context& outputCfg)
 	:	module(outputCfg)
 {
     try
@@ -112,7 +112,7 @@ inline auto deltaCast::getSampleRate     () const
     try
     {
         const std::int32_t code = HDMIAudioInfoFrame.SamplingFrequency;
-              std:: size_t sampleRate = 0;
+              std:: size_t sample_rate = 0;
         switch (code)
         {
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_REF_STREAM_HEADER:
@@ -122,28 +122,28 @@ inline auto deltaCast::getSampleRate     () const
             switch (codeRef)
             {
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_44100HZ:
-                sampleRate = 44100;
+                sample_rate = 44100;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_48000HZ:
-                sampleRate = 48000;
+                sample_rate = 48000;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_32000HZ:
-                sampleRate = 32000;
+                sample_rate = 32000;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_88200HZ:
-                sampleRate = 88200;
+                sample_rate = 88200;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_768000HZ:
-                sampleRate = 768000;
+                sample_rate = 768000;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_96000HZ:
-                sampleRate = 96000;
+                sample_rate = 96000;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_176000HZ:
-                sampleRate = 176000;
+                sample_rate = 176000;
                 break;
             case VHD_DV_AUDIO_AES_STS_SAMPLING_FREQ_192000HZ:
-                sampleRate = 192000;
+                sample_rate = 192000;
                 break;
             default:
                 throw std::invalid_argument("Invalide sample rate code.");
@@ -152,31 +152,31 @@ inline auto deltaCast::getSampleRate     () const
             break;
         }
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_32000HZ:
-            sampleRate = 32000;
+            sample_rate = 32000;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_44100HZ:
-            sampleRate = 44100;
+            sample_rate = 44100;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_48000HZ:
-            sampleRate = 48000;
+            sample_rate = 48000;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_88200HZ:
-            sampleRate = 88200;
+            sample_rate = 88200;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_96000HZ:
-            sampleRate = 96000;
+            sample_rate = 96000;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_176400HZ:
-            sampleRate = 176400;
+            sample_rate = 176400;
             break;
         case VHD_DV_AUDIO_INFOFRAME_SAMPLING_FREQ_192000HZ:
-            sampleRate = 192000;
+            sample_rate = 192000;
             break;
         default:
             throw std::invalid_argument("Invalide sample rate code.");
             break;
         }
-        return sampleRate;
+        return sample_rate;
     }
     catch (const std::invalid_argument& err)
     {
@@ -307,7 +307,7 @@ inline void deltaCast::startStream       ()
     BYTE*  pAudioBuffer = nullptr;
     ULONG  bufferSize   = 0;
 
-    audio->push_back(audioQueue<float>(outputConfig));
+    audio->push_back(audio_queue<float>(output_context));
 
     /* Start stream */
     VHD_StartStream(streamHdl->getHandle());
@@ -351,8 +351,8 @@ inline void deltaCast::startStream       ()
 inline auto deltaCast::byteCombineToShort(const std::uint8_t* sourceAudio,
                                           const std:: size_t  sourceSize) -> std::vector<short>
 {
-    const auto newSize = sourceSize / 2;
-    std::vector<short> shortArr(newSize);
+    const auto new_size = sourceSize / 2;
+    std::vector<short> shortArr(new_size);
 
     if (sourceSize % 2)
         throw std::invalid_argument("HDMI Audio Error : Invalid buffer size for 16 bit audio data.");

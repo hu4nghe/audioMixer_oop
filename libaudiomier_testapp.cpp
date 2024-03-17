@@ -1,19 +1,14 @@
 #include <print>
-#include <iostream>
-
-#include <iostream>
-#include <vector>
-#include <ranges>
-
-#include "audioMixer.h"
-#include "audioMixer_QTFF_Parser.h"
+#include "audio_output_queue.h"
+#include "audio_output_queue.cpp"
+#include "audio_types.cpp"
 
 /*
 * function for output configurations : sample rate, channel number, buffersize(in second)
-*/
-static outputParameter configuration()
+
+static audio_output_context configuration()
 {
-	outputParameter outConfig {};
+	audio_output_context output_context {};
 			   char ch		  {};
 
 	std::print("Audio mixer V1\n");
@@ -22,38 +17,43 @@ static outputParameter configuration()
 	std::cin >> ch;
 	if (ch == 'Y' || ch == 'y')
 	{
-		outputParameter out;
-		outConfig = out;
+		audio_output_context out;
+		output_context = out;
 	}
 	else if (ch == 'N' || ch == 'n')
 	{
 		std::print("Please enter the ouput sample rate : ");
-		std::cin >> outConfig.sampleRate;
+		std::cin >> output_context.sample_rate;
 
 		int cNum;
 		std::print("Please enter the number of ouput channels : ");
 		std::cin >> cNum;
 
-		outConfig.channelNumber = static_cast<uint8_t>(cNum);
+		output_context.channelNumber = static_cast<uint8_t>(cNum);
 
 		std::size_t time;
 		std::print("Please enter the maximum buffer size(in second) : ");
 		std::cin >> time;
-		outConfig.queueCapacity = time * outConfig.sampleRate * outConfig.channelNumber;
+		output_context.queueCapacity = time * output_context.sample_rate * output_context.channelNumber;
 		std::print("Please enter the minimum buffer size(in second) : ");
 		std::cin >> time;
-		outConfig.minimumElement = time * outConfig.sampleRate * outConfig.channelNumber;
+		output_context.minimumElement = time * output_context.sample_rate * output_context.channelNumber;
 	}
-	return outConfig;
-}
+	return output_context;
+}*/
 
 int main()
 {
-	
-	auto config = configuration();
-	
-	audioMixer mixer(config);
-	mixer.startStream();
+	float data[] = {9,1,2,3,5,6,2,2,1,3,5,6,7,2,5,3};
+	audio_output_context ctx;
+	ctx.channel_number = 8;
+	audio_queue<float> queue(ctx);
+	queue.push(data, 16, 44100, 2);
+	float* out = new float[128];
+	memset(out, 0, 128 * sizeof(float));
+	queue.pop(out, 8);
+	for (int i = 0; i < 64; i+=2)
+		std::print("{} {}\n", out[i], out[i + 1]);
 }	
 	
 	/*QTFF file parser test

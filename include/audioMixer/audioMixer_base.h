@@ -13,8 +13,8 @@
 template <typename T>
 using sPtr = std::shared_ptr<T>;
 
-template <audio_t T>
-using sPtrQueueList = std::shared_ptr<std::vector<audioQueue<T>>>;
+template <audio_type T>
+using sPtrQueueList = std::shared_ptr<std::vector<audio_queue<T>>>;
 
 
 /* Exceptions */
@@ -48,14 +48,14 @@ class audioMixerModule_base
 {
 protected:
     sPtrQueueList<float> audio;
-        outputParameter  outputConfig;
+        audio_output_context  output_context;
                    bool  active;
 public:
     audioMixerModule_base() 
         :   active      (false){};
-    audioMixerModule_base(const outputParameter& outputCfg) 
+    audioMixerModule_base(const audio_output_context& outputCfg) 
         :   active      (false), 
-            outputConfig(outputCfg){ audio = std::make_shared<std::vector<audioQueue<float>>>(); }
+            output_context(outputCfg){ audio = std::make_shared<std::vector<audio_queue<float>>>(); }
     virtual ~audioMixerModule_base() {}    
     //any copy or move of a audioMixer module is NOT possible!
     audioMixerModule_base           (const audioMixerModule_base&  other) = delete;
